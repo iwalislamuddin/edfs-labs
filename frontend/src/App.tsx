@@ -5,6 +5,7 @@ import Lobby from './ui/Lobby'
 // Satu Room = satu modul yang dimuat saat dibuka.
 const ROOMS: Record<string, React.LazyExoticComponent<React.ComponentType<{ query: string; onQuery: (q: string) => void }>>> = {
   spring: lazy(() => import('./rooms/spring/SpringRoom')),
+  pendulum: lazy(() => import('./rooms/pendulum/PendulumRoom')),
 }
 
 /** Rute hash: #/<room>?<query>. (Saat deploy: pindah ke path /<room> dengan fallback SPA.) */

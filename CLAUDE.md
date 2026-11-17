@@ -28,6 +28,9 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
 - `rooms/<room>/` — satu folder per Room, di-lazy-load dari `App.tsx` (`ROOMS`). Room Spring:
   `model.ts` (setup tarik/tekan/horizontal/rotasi, rentang, query URL), `stage.ts` (gambar panggung + hit test drag),
   `SpringRoom.tsx` (loop rAF, UI kontrol, tabel teori vs terukur, bar energi).
+  Room Pendulum (`rooms/pendulum/`): `physics.ts` (bandul 1 DOF non-linear + model linear, periode eksak via AGM,
+  bandul fisik batang, bandul ganda Lagrange + mode normal) diuji di `physics.test.ts`; integrator vektor umum `lab/ode.ts` (`rk4Vec`).
+  `lab/plot.ts` mendukung seri tambahan + legenda (`extra`, `mainLabel`).
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -37,7 +40,9 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
 
 ## Status & pekerjaan terbuka
 - Live: **Room Spring** (4 setup). Uji `sdof.test.ts` lulus (periode, energi, log decrement, redaman kritis).
-- Belum: Room lain (Pendulum, Model Struktur, Element, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
+- Live: **Room Pendulum** (tab Sederhana / Ganda / Fisik): grafik θ–t, model linear pembanding, T₀ vs T eksak vs terukur,
+  mode normal bandul ganda + bandul kembar (chaos), pusat osilasi bandul fisik.
+- Belum: Room lain (Model Struktur, Element, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
 - Repo GitHub berstatus publik, sementara README menyebut proprietary.

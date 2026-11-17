@@ -23,7 +23,7 @@ export const zones: Zone[] = [
     color: '#0d304b',
     rooms: [
       { slug: 'spring', name: 'Spring', desc: 'Pegas tarik, tekan, horizontal, rotasi. Hukum Hooke, periode, amplitudo, redaman.', state: 'live' },
-      { slug: 'pendulum', name: 'Pendulum', desc: 'Bandul sederhana, sudut besar, bandul ganda, bandul fisik.', state: 'soon' },
+      { slug: 'pendulum', name: 'Pendulum', desc: 'Bandul sederhana, sudut besar vs kecil, bandul ganda (chaos), bandul fisik.', state: 'live' },
       { slug: 'resonance', name: 'Resonance', desc: 'Gaya harmonik, resonansi, faktor amplifikasi dinamis.', state: 'soon' },
       { slug: 'shear-building', name: 'Shear Building', desc: 'Portal geser bertingkat, mode getar, frekuensi alami.', state: 'soon' },
       { slug: 'earthquake', name: 'Earthquake', desc: 'Respons SDOF terhadap rekaman gempa, spektrum respons.', state: 'soon' },

@@ -16,6 +16,10 @@ export interface PlotOptions {
   showAmplitude: boolean
   showPeriod: boolean
   envelope: { t0: number; a0: number; decay: number } | null
+  /** Seri tambahan (mis. model linear, massa kedua) — opsional. */
+  extra?: { samples: Sample[]; color: string; dash?: number[]; label: string }[]
+  /** Label seri utama untuk legenda (muncul bila ada seri tambahan). */
+  mainLabel?: string
 }
 
 function niceStep(range: number, target = 4) {
@@ -62,6 +66,8 @@ export function drawPlot(
   const visible = samples.filter((s) => s.t >= t0 - 0.05)
   let maxAbs = 0
   for (const s of visible) maxAbs = Math.max(maxAbs, Math.abs(s.u * o.factor))
+  const extras = (o.extra ?? []).map((e) => ({ ...e, visible: e.samples.filter((s) => s.t >= t0 - 0.05) }))
+  for (const e of extras) for (const s of e.visible) maxAbs = Math.max(maxAbs, Math.abs(s.u * o.factor))
   scale.update(Math.max(maxAbs * 1.2, o.unit === '°' ? 5 : 0.5))
   const yMax = scale.y
 
@@ -138,6 +144,22 @@ export function drawPlot(
     ctx.setLineDash([])
   }
 
+  // seri tambahan (di bawah kurva utama)
+  for (const e of extras) {
+    ctx.strokeStyle = e.color
+    ctx.lineWidth = 1.6
+    ctx.setLineDash(e.dash ?? [])
+    ctx.beginPath()
+    e.visible.forEach((s, i) => {
+      const x = X(s.t)
+      const y = Y(s.u * o.factor)
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+
   // kurva
   ctx.strokeStyle = C.navy
   ctx.lineWidth = 2
@@ -201,6 +223,33 @@ export function drawPlot(
     ctx.fillText(`T = ${(b.t - a.t).toFixed(3)} s`, (xa + xb) / 2, Math.max(T + 14, yb - 2))
   }
   ctx.restore()
+
+  // legenda
+  if (extras.length) {
+    const items = [{ label: o.mainLabel ?? o.name, color: C.navy, dash: [] as number[] }, ...extras]
+    ctx.font = FONT
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    let x = L + pw - 8
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i]
+      const tw = ctx.measureText(it.label).width
+      x -= tw + 26
+      const y = T + 10
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      ctx.fillRect(x - 3, y - 8, tw + 28, 16)
+      ctx.strokeStyle = it.color
+      ctx.lineWidth = 2
+      ctx.setLineDash(it.dash ?? [])
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineTo(x + 18, y)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = C.ink
+      ctx.fillText(it.label, x + 22, y)
+    }
+  }
 
   // titik saat ini
   const cur = samples[samples.length - 1]
