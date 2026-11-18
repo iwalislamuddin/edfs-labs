@@ -6,6 +6,7 @@ import Lobby from './ui/Lobby'
 const ROOMS: Record<string, React.LazyExoticComponent<React.ComponentType<{ query: string; onQuery: (q: string) => void }>>> = {
   spring: lazy(() => import('./rooms/spring/SpringRoom')),
   pendulum: lazy(() => import('./rooms/pendulum/PendulumRoom')),
+  structure: lazy(() => import('./rooms/structure/StructureRoom')),
 }
 
 /** Rute hash: #/<room>?<query>. (Saat deploy: pindah ke path /<room> dengan fallback SPA.) */

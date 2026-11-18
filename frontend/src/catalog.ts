@@ -35,7 +35,7 @@ export const zones: Zone[] = [
     tagline: 'Gaya, keseimbangan, dan perilaku struktur 2D',
     color: '#566449',
     rooms: [
-      { slug: 'structure', name: 'Structure Model', desc: 'Balok, portal, gable, truss: reaksi, diagram N-V-M, lendutan.', state: 'soon' },
+      { slug: 'structure', name: 'Structure Model', desc: 'Balok, portal, gable, truss: reaksi, diagram N-V-M, lendutan.', state: 'live' },
       { slug: 'equilibrium', name: 'Equilibrium', desc: 'Diagram benda bebas, resultan gaya, momen dan tuas.', state: 'soon' },
       { slug: 'influence-line', name: 'Influence Line', desc: 'Beban berjalan dan garis pengaruh.', state: 'soon' },
       { slug: 'cable-arch', name: 'Cable & Arch', desc: 'Kabel, pelengkung tiga sendi, garis tekan.', state: 'soon' },
