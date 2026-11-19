@@ -47,6 +47,14 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   `physics.test.ts`; setup Gaya Harmonik / Eksitasi Dasar (u relatif, x = u + ug; "dari diam" = diam mutlak, v = −ug0·ω).
   `freq.ts` grafik Rd|TR + φ vs β (geser untuk set ω), titik terukur hijau dicatat otomatis saat tunak + "Sapu frekuensi".
   `stage.ts` massa–pegas–peredam horizontal, meja getar, diagram fasor. `lab/plot.ts` punya opsi `hlines`.
+  Inti MDOF `lab/mdof.ts` (bangunan geser: `stiffness`, `jacobiEigen`, `modes()` ternormalisasi massa + Γ + massa efektif,
+  `pushShape`, `classicalDamping`, `steadyRel` modal kompleks, `stepModal`/`steadyModal`/`measureRoof`) diuji di
+  `mdof.test.ts` (rumus tertutup gedung seragam, ortogonalitas, modal = integrasi langsung sistem penuh). Integrator SDOF
+  gaya harmonik dipindah ke `lab/forced.ts` (dipakai Resonance dan Shear Building).
+  Room Shear Building (`rooms/shear-building/`, slug `shear-building`): setup Getaran Bebas / Gerak Tanah Harmonik;
+  simulasi di koordinat modal (ζ sama semua mode), perubahan parameter memproyeksikan keadaan fisik ke mode baru.
+  `stage.ts` gedung (kolom kurva S) + profil simpangan & selubung; `modes.ts` panel mode mini (klik = getarkan mode);
+  `freq.ts` respons frekuensi log tiap lantai vs ω/ω₁ + titik terukur/sapuan.
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -66,6 +74,8 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   Lanjutan: rosette input (ε0/ε45/ε90 → tegangan), kriteria keruntuhan Mohr–Coulomb (jembatan ke Zone Tanah).
 - Live: **Room Resonance** (Fase 2): transien + tunak, fasor, Rd/TR & fase teori vs terukur, isolasi β > √2.
   Lanjutan: massa tak seimbang (mesin, p0 = me·e·ω²), sapuan chirp kontinu, TMD (jembatan ke Shear Building/Earthquake).
+- Live: **Room Shear Building** (Fase 2): 2–5 lantai, lantai lunak, massa atap, mode & massa efektif, drift & geser
+  dasar maks, tarik pelat lantai, resonansi tiap mode. Lanjutan: spektrum/rekaman gempa (Room Earthquake), TMD di atap.
 - Belum: Room lain (Fase 2 Material, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
