@@ -27,6 +27,7 @@ export const zones: Zone[] = [
       { slug: 'resonance', name: 'Resonance', desc: 'Gaya harmonik dan eksitasi dasar: transien, resonansi, Rd, fase, transmisibilitas.', state: 'live' },
       { slug: 'shear-building', name: 'Shear Building', desc: 'Portal geser 2–5 lantai: mode getar, massa efektif, lantai lunak, resonansi gerak tanah.', state: 'live' },
       { slug: 'earthquake', name: 'Earthquake', desc: 'Gempa sintetis, spektrum respons titik demi titik vs SNI 1726, isolasi dasar.', state: 'live' },
+      { slug: 'machine', name: 'Machine Foundation', desc: 'Mesin rotasi & torak di atas blok tanah atau meja beton: start/stop melewati resonansi.', state: 'live' },
     ],
   },
   {

@@ -51,9 +51,10 @@ Dasar dinamika struktur dan gempa.
 |---|---|---|
 | **Spring** | Pegas vertikal (tarik / tekan), horizontal, rotasi. Hukum Hooke, SDOF bebas teredam, grafik u(t), T, A, ζ, energi | **MVP — prototipe ada** |
 | **Pendulum** | Bandul sederhana, sudut besar vs kecil (non-linear), bandul ganda (chaos), bandul fisik | MVP |
-| Resonance | SDOF dengan gaya harmonik p₀ sin ωt: respons transien + tunak, kurva faktor amplifikasi dinamis vs ω/ωn | Fase 2 |
-| Shear Building | Portal geser 2–5 lantai (MDOF), mode shape, frekuensi alami, animasi tiap mode | Fase 2 |
-| Earthquake | SDOF di atas tanah bergerak (rekaman gempa), membangun spektrum respons titik demi titik, TMD/base isolation | Fase 3 |
+| Resonance | SDOF dengan gaya harmonik p₀ sin ωt: respons transien + tunak, kurva faktor amplifikasi dinamis vs ω/ωn | **live** |
+| Shear Building | Portal geser 2–5 lantai (MDOF), mode shape, frekuensi alami, animasi tiap mode | **live** |
+| Earthquake | SDOF di atas tanah bergerak (rekaman gempa), membangun spektrum respons titik demi titik, TMD/base isolation | **live** (sintetis) |
+| Machine Foundation | Mesin rotasi & torak di atas blok tanah (Lysmer) atau meja beton; start/stop melewati resonansi | **live** |
 
 ### Zone 2 — Statika & Struktur
 | Room | Isi | Prioritas |

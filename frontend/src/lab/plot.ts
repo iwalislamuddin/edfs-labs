@@ -104,7 +104,7 @@ export function drawPlot(
     ctx.lineTo(x, T + ph)
     ctx.stroke()
     ctx.fillStyle = C.mute
-    ctx.fillText(t.toFixed(xs < 1 ? 1 : 0), x, T + ph + 6)
+    ctx.fillText(t.toFixed(xs >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(xs) - 1e-9))), x, T + ph + 6)
   }
   ctx.strokeStyle = C.line
   ctx.strokeRect(L, T, pw, ph)

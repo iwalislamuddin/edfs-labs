@@ -10,6 +10,7 @@ const ROOMS: Record<string, React.LazyExoticComponent<React.ComponentType<{ quer
   element: lazy(() => import('./rooms/element/ElementRoom')),
   'shear-building': lazy(() => import('./rooms/shear-building/ShearBuildingRoom')),
   earthquake: lazy(() => import('./rooms/earthquake/EarthquakeRoom')),
+  machine: lazy(() => import('./rooms/machine/MachineRoom')),
   resonance: lazy(() => import('./rooms/resonance/ResonanceRoom')),
 }
 

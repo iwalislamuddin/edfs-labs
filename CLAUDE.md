@@ -55,6 +55,16 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   simulasi di koordinat modal (ζ sama semua mode), perubahan parameter memproyeksikan keadaan fisik ke mode baru.
   `stage.ts` gedung (kolom kurva S) + profil simpangan & selubung; `modes.ts` panel mode mini (klik = getarkan mode);
   `freq.ts` respons frekuensi log tiap lantai vs ω/ω₁ + titik terukur/sapuan.
+  Inti gempa `lab/ground.ts`: rekaman SINTETIS deterministik per seed (Kanai–Tajimi × selubung + high-pass, pulsa
+  dekat sesar, sinus), integrasi eksak Nigam–Jennings (`njCoef`, `sdofResponse`), `spectrum()` Sd/PSv/PSa, `sniSa()`
+  spektrum desain SNI 1726, `groundMotion()` (v, d dengan koreksi garis dasar untuk gambar); diuji di `ground.test.ts`.
+  Room Earthquake (`rooms/earthquake/`, slug `earthquake`): tab Spektrum Respons (titik hijau dicatat saat rekaman
+  selesai, geser grafik spektrum untuk T) dan Isolasi Dasar (`isolation.ts` 2DOF, diuji di `isolation.test.ts`);
+  `charts.ts` riwayat waktu penuh bertumpuk + spektrum; parameter apa pun yang mengubah eksperimen memulai ulang t = 0.
+  Room Machine Foundation (`rooms/machine/`, slug `machine`): `physics.ts` (kinematika engkol eksak, gaya mesin rotasi
+  m·e·ω² / torak primer+sekunder, analog Lysmer kz/cz, amplitudo tunak 2 harmonik, RK4 dengan θ, ω, α) diuji di
+  `physics.test.ts`; setup Mesin Rotasi / Mesin Torak × pondasi blok tanah / meja; start/stop dengan laju rpm/s,
+  jejak run-up amplitudo vs rpm, takometer dengan pita resonansi ±20%, kategori kecepatan indikatif.
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -76,6 +86,10 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   Lanjutan: massa tak seimbang (mesin, p0 = me·e·ω²), sapuan chirp kontinu, TMD (jembatan ke Shear Building/Earthquake).
 - Live: **Room Shear Building** (Fase 2): 2–5 lantai, lantai lunak, massa atap, mode & massa efektif, drift & geser
   dasar maks, tarik pelat lantai, resonansi tiap mode. Lanjutan: spektrum/rekaman gempa (Room Earthquake), TMD di atap.
+- Live: **Room Earthquake**: gempa sintetis (bukan rekaman nyata), spektrum titik demi titik vs SNI 1726, isolasi dasar.
+  Lanjutan: impor rekaman nyata (CSV/AT2), spektrum MDOF (gabung Shear Building, SRSS/CQC), TMD, histeretik/daktilitas.
+- Live: **Room Machine Foundation**: mesin rotasi & torak, blok tanah (redaman radiasi) vs meja beton, run-up/coast-down.
+  Lanjutan: mode horizontal & rocking (gaya horizontal rotor, momen guling), multi-silinder, isolator pegas.
 - Belum: Room lain (Fase 2 Material, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
