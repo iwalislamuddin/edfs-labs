@@ -37,6 +37,11 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   serat tertarik. `model.ts` membangun Frame per setup (sederhana, kantilever, menerus, portal, gable, truss Pratt/Howe/Warren),
   `theory.ts` rumus tangan (tiga momen, portal dua sendi, Ritter) diuji terhadap solver di `structure.test.ts`;
   `stage.ts` gambar diagram/lendutan/reaksi + drag beban P + hover readout.
+  Room Element (`rooms/element/`, slug `element`): `mohr.ts` (transformasi tegangan/regangan bidang, tegangan utama,
+  θp/θs, 3 tegangan utama dengan σz, Von Mises/Tresca, Hooke 2D, strain gauge) diuji di `mohr.test.ts`. Konvensi: tarik +,
+  θ berlawanan jarum jam, Mohr digambar dengan τ positif ke bawah (X = (σx, τxy), Y = (σy, −τxy)) sehingga titik berputar
+  2θ searah elemen. `stage.ts`: elemen kiri (diputar / terdeformasi + gauge / kubus 3D) + lingkaran Mohr kanan
+  (bertumpuk vertikal bila lebar < 560 px), skala Mohr membesar seketika dan mengecil perlahan; `drawCurves` σ(θ).
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -51,7 +56,10 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
 - Live: **Room Structure Model** (6 setup): diagram N/V/M & lendutan di panggung, P bisa digeser, hover baca nilai,
   tabel teori vs matriks kekakuan, gaya batang. Lanjutan: beban bergerak/garis pengaruh, sambungan sendi dalam (release),
   ekspor, tautan "Lanjut di EDFS Matrix".
-- Belum: Room lain (Element, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
+- Live: **Room Element** (tab Tegangan & Mohr / Regangan & Poisson / Tiga Dimensi): elemen bisa diputar dengan drag
+  (di elemen atau titik X′ di lingkaran Mohr), 6 kasus bawaan, tabel rumus vs pindai θ, grafik σ(θ).
+  Lanjutan: rosette input (ε0/ε45/ε90 → tegangan), kriteria keruntuhan Mohr–Coulomb (jembatan ke Zone Tanah).
+- Belum: Room lain (Fase 2 Material, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
 - Repo GitHub berstatus publik, sementara README menyebut proprietary.

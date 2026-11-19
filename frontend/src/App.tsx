@@ -7,6 +7,7 @@ const ROOMS: Record<string, React.LazyExoticComponent<React.ComponentType<{ quer
   spring: lazy(() => import('./rooms/spring/SpringRoom')),
   pendulum: lazy(() => import('./rooms/pendulum/PendulumRoom')),
   structure: lazy(() => import('./rooms/structure/StructureRoom')),
+  element: lazy(() => import('./rooms/element/ElementRoom')),
 }
 
 /** Rute hash: #/<room>?<query>. (Saat deploy: pindah ke path /<room> dengan fallback SPA.) */

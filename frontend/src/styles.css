@@ -126,4 +126,5 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   .stage { height: 380px; }
   .plot { height: 200px; }
   .crumb-path { display: none; }
+  .stage-tip.wide-only { display: none; }
 }
