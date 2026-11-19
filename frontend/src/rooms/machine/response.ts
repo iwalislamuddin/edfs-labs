@@ -1,15 +1,29 @@
-// Grafik amplitudo tunak pondasi terhadap putaran (rpm) + jejak run-up hasil simulasi + batas kecepatan indikatif.
+// Grafik amplitudo tunak di bantalan terhadap putaran (rpm) + jejak run-up hasil simulasi + batas kecepatan indikatif.
 import { C, FONT, FONT_B } from '../../lab/theme'
 
-export interface RespInput {
+export interface Curve {
   /** Amplitudo tunak teori (m) sebagai fungsi rpm. */
-  curve: (rpm: number) => number
+  fn: (rpm: number) => number
+  color: string
+  label: string
+  /** Jejak simulasi untuk arah yang sama. */
+  trace: { rpm: number; amp: number }[]
+}
+
+export interface Band {
+  rpm: number
+  color: string
+  label: string
+}
+
+export interface RespInput {
+  curves: Curve[]
+  bands: Band[]
+  /** Pita harmonik kedua (torak). */
+  bands2: Band[]
   rpmMax: number
-  rpmN: number
-  torak: boolean
   rpm: number
   target: number
-  trace: { rpm: number; amp: number }[]
   /** Kecepatan puncak batas indikatif (m/s). */
   vLim: number
 }
@@ -29,26 +43,26 @@ export function drawResponse(ctx: CanvasRenderingContext2D, w: number, h: number
   const ph = h - T - B
   ctx.fillStyle = C.bg
   ctx.fillRect(0, 0, w, h)
-  const N = 500
-  const vals: number[] = []
+  const N = 400
+  const vals = o.curves.map((c) => {
+    const out: number[] = []
+    for (let i = 0; i <= N; i++) out.push(c.fn((i / N) * o.rpmMax) * 1e6)
+    return out
+  })
   let mx = 0
-  for (let i = 0; i <= N; i++) {
-    const v = o.curve((i / N) * o.rpmMax) * 1e6
-    vals.push(v)
-    if (Number.isFinite(v)) mx = Math.max(mx, v)
-  }
-  for (const p of o.trace) mx = Math.max(mx, p.amp * 1e6)
+  for (const v of vals) for (const x of v) if (Number.isFinite(x)) mx = Math.max(mx, x)
+  for (const c of o.curves) for (const p of c.trace) mx = Math.max(mx, p.amp * 1e6)
   const yMax = mx * 1.12 || 1
   const X = (r: number) => L + (r / o.rpmMax) * pw
   const Y = (v: number) => T + ph - (Math.min(v, yMax * 1.05) / yMax) * ph
 
-  // pita resonansi
   const band = (a: number, b: number, color: string) => {
+    if (a >= o.rpmMax) return
     ctx.fillStyle = color
     ctx.fillRect(X(Math.max(0, a)), T, X(Math.min(o.rpmMax, b)) - X(Math.max(0, a)), ph)
   }
-  band(0.8 * o.rpmN, 1.25 * o.rpmN, 'rgba(181,69,47,0.08)')
-  if (o.torak) band(0.4 * o.rpmN, 0.625 * o.rpmN, 'rgba(237,141,59,0.10)')
+  for (const b of o.bands2) band(0.8 * b.rpm, 1.25 * b.rpm, b.color)
+  for (const b of o.bands) band(0.8 * b.rpm, 1.25 * b.rpm, b.color)
 
   ctx.font = FONT
   ctx.lineWidth = 1
@@ -90,14 +104,13 @@ export function drawResponse(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = C.ink
-  ctx.fillText('amplitudo (µm)', 0, 0)
+  ctx.fillText('amplitudo di bantalan (µm)', 0, 0)
   ctx.restore()
 
   ctx.save()
   ctx.beginPath()
   ctx.rect(L, T, pw, ph)
   ctx.clip()
-  // batas kecepatan indikatif: X = v/ω
   ctx.strokeStyle = C.orange
   ctx.setLineDash([6, 4])
   ctx.lineWidth = 1.4
@@ -110,65 +123,75 @@ export function drawResponse(ctx: CanvasRenderingContext2D, w: number, h: number
   }
   ctx.stroke()
   ctx.setLineDash([])
-  // teori
-  ctx.strokeStyle = C.navy
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  vals.forEach((v, i) => {
-    const x = L + (i / N) * pw
-    if (i === 0) ctx.moveTo(x, Y(v))
-    else ctx.lineTo(x, Y(v))
-  })
-  ctx.stroke()
-  // jejak simulasi
-  if (o.trace.length > 1) {
-    ctx.strokeStyle = C.green
-    ctx.lineWidth = 2.4
-    ctx.globalAlpha = 0.85
+  o.curves.forEach((c, k) => {
+    ctx.strokeStyle = c.color
+    ctx.lineWidth = 2
     ctx.beginPath()
-    o.trace.forEach((p, i) => {
+    vals[k].forEach((v, i) => {
+      const x = L + (i / N) * pw
+      if (i === 0) ctx.moveTo(x, Y(v))
+      else ctx.lineTo(x, Y(v))
+    })
+    ctx.stroke()
+  })
+  // jejak simulasi: garis tebal semi-transparan dengan warna arah yang sama
+  for (const c of o.curves) {
+    if (c.trace.length < 2) continue
+    ctx.strokeStyle = c.color
+    ctx.globalAlpha = 0.35
+    ctx.lineWidth = 6
+    ctx.lineJoin = 'round'
+    ctx.beginPath()
+    c.trace.forEach((p, i) => {
       if (i === 0) ctx.moveTo(X(p.rpm), Y(p.amp * 1e6))
       else ctx.lineTo(X(p.rpm), Y(p.amp * 1e6))
     })
     ctx.stroke()
     ctx.globalAlpha = 1
   }
-  // putaran kerja & sekarang
   ctx.strokeStyle = C.green
   ctx.setLineDash([3, 3])
+  ctx.lineWidth = 1.2
   ctx.beginPath()
   ctx.moveTo(X(o.target), T)
   ctx.lineTo(X(o.target), T + ph)
   ctx.stroke()
   ctx.setLineDash([])
-  const now = o.curve(o.rpm) * 1e6
-  ctx.fillStyle = C.orange
-  ctx.beginPath()
-  ctx.arc(X(o.rpm), Y(now), 5, 0, Math.PI * 2)
-  ctx.fill()
+  for (const c of o.curves) {
+    ctx.fillStyle = c.color
+    ctx.beginPath()
+    ctx.arc(X(o.rpm), Y(c.fn(o.rpm) * 1e6), 4.5, 0, Math.PI * 2)
+    ctx.fill()
+  }
   ctx.restore()
 
+  // label pita
   ctx.font = FONT
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillStyle = C.red
-  if (o.rpmN < o.rpmMax) ctx.fillText(`resonansi ${Math.round(o.rpmN)} rpm ±20%`, Math.min(X(0.8 * o.rpmN) + 4, L + pw - 160), T + 4)
-  if (o.torak && 0.5 * o.rpmN < o.rpmMax) {
-    ctx.fillStyle = C.orange
-    ctx.fillText('harmonik 2 (2ω = ωn)', Math.min(X(0.4 * o.rpmN) + 4, L + pw - 160), T + 20)
-  }
+  ;[...o.bands, ...o.bands2].forEach((b, i) => {
+    if (b.rpm >= o.rpmMax) return
+    ctx.fillStyle = b.color.replace(/[\d.]+\)$/, '1)')
+    ctx.fillText(b.label, Math.min(X(0.8 * b.rpm) + 3, L + pw - 130), T + 4 + (i % 4) * 14)
+  })
+  // legenda
   ctx.textAlign = 'right'
-  ctx.fillStyle = C.navy
-  ctx.fillText('— teori tunak', L + pw - 8, T + 40)
-  ctx.fillStyle = C.green
-  ctx.fillText('— jejak simulasi (start/stop)', L + pw - 8, T + 56)
+  let ly = T + 64
+  for (const c of o.curves) {
+    ctx.fillStyle = c.color
+    ctx.fillText(`— ${c.label}`, L + pw - 8, ly)
+    ly += 15
+  }
+  ctx.fillStyle = C.mute
+  ctx.fillText('▬ jejak simulasi (start/stop)', L + pw - 8, ly)
   ctx.fillStyle = C.orange
-  ctx.fillText(`- - batas v = ${(o.vLim * 1000).toFixed(1)} mm/s (indikatif)`, L + pw - 8, T + 72)
+  ctx.fillText(`- - batas v = ${(o.vLim * 1000).toFixed(1)} mm/s (indikatif)`, L + pw - 8, ly + 15)
   ctx.font = FONT_B
   ctx.fillStyle = C.green
-  ctx.textAlign = X(o.target) > L + pw - 90 ? 'right' : 'left'
+  const left = X(o.target) < L + pw - 90
+  ctx.textAlign = left ? 'left' : 'right'
   ctx.textBaseline = 'bottom'
-  ctx.fillText('putaran kerja', X(o.target) + (ctx.textAlign === 'left' ? 4 : -4), T + ph - 4)
+  ctx.fillText('putaran kerja', X(o.target) + (left ? 4 : -4), T + ph - 4)
   return { L, pw, rpmMax: o.rpmMax }
 }
 

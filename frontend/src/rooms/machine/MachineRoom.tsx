@@ -4,18 +4,32 @@ import { drawPlot, PlotScale, type Sample } from '../../lab/plot'
 import { C } from '../../lab/theme'
 import { Segmented, Slider } from '../../ui/controls'
 import { defaults, FNDS, foundationOf, machineOf, parseQuery, RANGES, RPM_MAX, SETUPS, severity, toQuery, type FndKind, type Params, type Setup } from './model'
-import { forceHarmonics, machineForce, phase, rpmToW, steadyAmp, stepM, wnOf, wToRpm, zetaOf, type MState } from './physics'
+import { forceHarmonics, rpmToW, wToRpm } from './physics'
 import { drawResponse, rpmAt, type RespLayout } from './response'
+import { bearing, machineForces, modes3, step3, steady3, steadyState3, type Mode3, type State3 } from './rocking'
 import { drawStage, targetScale } from './stage'
 
 const H = 1 / 4000
 const V_LIM = 6.3e-3 // m/s, batas indikatif "dapat diterima"
+const ORBIT_N = 96
+
+/** Warna pita per jenis mode: [isi grafik, busur takometer]. */
+const MODE_COLOR: Record<Mode3['kind'], { fill: string; arc: string; line: string }> = {
+  vertikal: { fill: 'rgba(181,69,47,0.08)', arc: 'rgba(181,69,47,0.75)', line: '#b5452f' },
+  'geser–rocking 1': { fill: 'rgba(102,20,101,0.08)', arc: 'rgba(102,20,101,0.7)', line: '#661465' },
+  'geser–rocking 2': { fill: 'rgba(31,111,139,0.08)', arc: 'rgba(31,111,139,0.7)', line: '#1f6f8b' },
+}
 
 interface Readout {
   rpm: number
   t: number
-  amp: number | null
-  u: number
+  hx: number | null
+  hz: number | null
+}
+
+interface Trace {
+  hx: { rpm: number; amp: number }[]
+  hz: { rpm: number; amp: number }[]
 }
 
 export default function MachineRoom({ query, onQuery }: { query: string; onQuery: (q: string) => void }) {
@@ -25,51 +39,96 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
   const [motorOn, setMotorOn] = useState(false)
   const [running, setRunning] = useState(true)
   const [speed, setSpeed] = useState(0.1)
-  const [read, setRead] = useState<Readout>({ rpm: 0, t: 0, amp: null, u: 0 })
+  const [read, setRead] = useState<Readout>({ rpm: 0, t: 0, hx: null, hz: null })
 
+  const tanah = p.fd === 'tanah'
   const mach = useMemo(() => machineOf(setup, p), [setup, p])
   const fnd = useMemo(() => foundationOf(p), [p])
-  const wn = wnOf(fnd)
-  const z = zetaOf(fnd)
-  const rpmN = wToRpm(wn)
+  const sys = fnd.sys
+  const modes = useMemo<Mode3[]>(
+    () => (tanah ? modes3(sys) : [{ w: Math.sqrt(fnd.k / fnd.M), zeta: fnd.c / (2 * Math.sqrt(fnd.k * fnd.M)), phi: [0, 1, 0], kind: 'vertikal' }]),
+    [sys, tanah, fnd],
+  )
   const rpmMax = RPM_MAX[setup]
   const target = motorOn ? p.rpm : 0
+  const bands = modes.map((m) => ({ rpm: wToRpm(m.w), color: MODE_COLOR[m.kind].fill, arc: MODE_COLOR[m.kind].arc, label: `${m.kind} ${Math.round(wToRpm(m.w))} rpm` }))
+  // harmonik kedua mesin torak hanya vertikal → memicu mode vertikal, dan rocking bila poros tidak di tengah
+  const bands2 =
+    setup === 'torak'
+      ? modes
+          .filter((m) => m.kind === 'vertikal' || (tanah && Math.abs(p.ex) > 1e-9))
+          .map((m) => ({ rpm: wToRpm(m.w) / 2, color: 'rgba(237,141,59,0.10)', arc: 'rgba(237,141,59,0.6)', label: `2ω = ω ${m.kind}` }))
+      : []
 
-  const live = useRef({ setup, p, mach, fnd, target, running, speed, rpmMax, rpmN })
-  live.current = { setup, p, mach, fnd, target, running, speed, rpmMax, rpmN }
+  // kurva teori di-cache: 400 titik rpm, dihitung ulang hanya bila parameter berubah
+  const table = useMemo(() => {
+    const n = 400
+    const hx: number[] = []
+    const hz: number[] = []
+    for (let i = 0; i <= n; i++) {
+      const st = steady3(sys, mach, rpmToW((i / n) * rpmMax))
+      hx.push(st.hx)
+      hz.push(st.hz)
+    }
+    const look = (arr: number[]) => (rpm: number) => {
+      const x = Math.min(n, Math.max(0, (rpm / rpmMax) * n))
+      const i = Math.min(n - 1, Math.floor(x))
+      return arr[i] + (arr[i + 1] - arr[i]) * (x - i)
+    }
+    return { hx: look(hx), hz: look(hz) }
+  }, [sys, mach, rpmMax])
+
+  const live = useRef({ setup, p, mach, sys, target, running, speed, rpmMax, bands, bands2, tanah, table })
+  live.current = { setup, p, mach, sys, target, running, speed, rpmMax, bands, bands2, tanah, table }
 
   const stageRef = useRef<HTMLCanvasElement>(null)
   const plotRef = useRef<HTMLCanvasElement>(null)
   const respRef = useRef<HTMLCanvasElement>(null)
-  const sim = useRef<MState & { t: number }>({ u: 0, v: 0, th: 0, w: 0, t: 0 })
+  const sim = useRef<State3 & { t: number }>({ q: [0, 0, 0], v: [0, 0, 0], th: 0, w: 0, t: 0 })
   const hist = useRef<Sample[]>([])
+  const histX = useRef<Sample[]>([])
   const histF = useRef<Sample[]>([])
-  const trace = useRef<{ rpm: number; amp: number }[]>([])
-  const rev = useRef({ n: 0, max: 0, last: 0 })
+  const trace = useRef<Trace>({ hx: [], hz: [] })
+  const rev = useRef({ hx: 0, hz: 0, last: 0 })
+  const orbit = useRef<[number, number][]>([])
+  const orbitTh = useRef(0)
   const view = useRef(0)
   const plotScale = useRef(new PlotScale())
   const respLayout = useRef<RespLayout | null>(null)
 
   useEffect(() => onQuery(toQuery(setup, p)), [setup, p]) // eslint-disable-line react-hooks/exhaustive-deps
+  // jenis pondasi berganti → keadaan lama tidak berlaku
+  useEffect(() => {
+    sim.current = { ...sim.current, q: [0, 0, 0], v: [0, 0, 0] }
+    trace.current = { hx: [], hz: [] }
+    orbit.current = []
+    view.current = 0
+  }, [p.fd])
+
+  const clearTrace = () => {
+    trace.current = { hx: [], hz: [] }
+    orbit.current = []
+  }
 
   const changeSetup = (s: Setup) => {
     setSetup(s)
     setP({ ...defaults(s), fd: p.fd })
     setMotorOn(false)
-    sim.current = { u: 0, v: 0, th: 0, w: 0, t: 0 }
-    trace.current = []
+    sim.current = { q: [0, 0, 0], v: [0, 0, 0], th: 0, w: 0, t: 0 }
+    clearTrace()
     hist.current = []
+    histX.current = []
     histF.current = []
     view.current = 0
   }
 
   const start = () => {
-    trace.current = []
+    clearTrace()
     setMotorOn(true)
     setRunning(true)
   }
   const stop = () => {
-    trace.current = []
+    clearTrace()
     setMotorOn(false)
     setRunning(true)
   }
@@ -77,17 +136,9 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
   const jump = () => {
     const w = rpmToW(p.rpm)
     const th = sim.current.th
-    const [F1, F2] = forceHarmonics(mach, w)
-    const st = (F: number, n: number) => {
-      const b = (n * w) / wn
-      const X = (F / fnd.k) / Math.hypot(1 - b * b, 2 * z * b)
-      const ph = phase(b, z)
-      return { u: X * Math.cos(n * th - ph), v: -X * n * w * Math.sin(n * th - ph) }
-    }
-    const a = st(F1, 1)
-    const b = setup === 'torak' ? st(F2, 2) : { u: 0, v: 0 }
-    sim.current = { ...sim.current, u: a.u + b.u, v: a.v + b.v, w }
-    trace.current = []
+    const st = steadyState3(sys, mach, w, th)
+    sim.current = { ...sim.current, q: st.q, v: st.v, w }
+    clearTrace()
     setMotorOn(true)
     setRunning(true)
   }
@@ -111,77 +162,102 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
         while (rem > 1e-12) {
           const h = Math.min(H, rem)
           const dw = wT - s.w
-          let a = 0
-          if (Math.abs(dw) > rateW * h) a = Math.sign(dw) * rateW
-          const n = stepM(L.mach, L.fnd, s, a, h)
-          if (a === 0) n.w = wT
-          s.u = n.u
-          s.v = n.v
-          s.w = Math.max(0, n.w)
-          // hitung putaran untuk jejak amplitudo
+          const a = Math.abs(dw) > rateW * h ? Math.sign(dw) * rateW : 0
+          const n = step3(L.sys, L.mach, s, a, h)
           const thPrev = s.th
+          s.q = n.q
+          s.v = n.v
           s.th = n.th
+          s.w = a === 0 ? wT : Math.max(0, n.w)
           s.t += h
           rem -= h
+          const [bx, bz] = bearing(L.sys, s.q)
           if (s.t - lastSample >= winSim / 400 || lastSample < 0) {
-            hist.current.push({ t: s.t, u: s.u })
-            histF.current.push({ t: s.t, u: machineForce(L.mach, s.th, s.w, 0) / L.fnd.k })
+            hist.current.push({ t: s.t, u: bz })
+            histX.current.push({ t: s.t, u: bx })
+            histF.current.push({ t: s.t, u: machineForces(L.mach, s.th, s.w, 0)[1] / L.sys.kz })
             lastSample = s.t
             if (hist.current.length > 4000) {
               const cut = s.t - winSim * 1.3
               hist.current = hist.current.filter((x) => x.t >= cut)
+              histX.current = histX.current.filter((x) => x.t >= cut)
               histF.current = histF.current.filter((x) => x.t >= cut)
             }
           }
+          // orbit bantalan: satu putaran terakhir
+          if (Math.abs(s.th - orbitTh.current) >= (2 * Math.PI) / ORBIT_N || orbit.current.length === 0) {
+            orbitTh.current = s.th
+            orbit.current.push([bx, bz])
+            if (orbit.current.length > ORBIT_N + 1) orbit.current.shift()
+          }
+          // jejak amplitudo per putaran
           const r = rev.current
-          r.max = Math.max(r.max, Math.abs(s.u))
+          r.hx = Math.max(r.hx, Math.abs(bx))
+          r.hz = Math.max(r.hz, Math.abs(bz))
           if (Math.floor(s.th / (2 * Math.PI)) !== Math.floor(thPrev / (2 * Math.PI)) || s.t - r.last > 0.5) {
             const rpm = wToRpm(s.w)
-            const tr = trace.current
-            const prev = tr[tr.length - 1]
-            if (!prev || Math.abs(prev.rpm - rpm) > L.rpmMax / 600 || s.w === wT) {
-              if (prev && Math.abs(prev.rpm - rpm) <= L.rpmMax / 600) tr[tr.length - 1] = { rpm, amp: r.max }
-              else tr.push({ rpm, amp: r.max })
+            for (const [key, amp] of [
+              ['hx', r.hx],
+              ['hz', r.hz],
+            ] as const) {
+              const tr = trace.current[key]
+              const prev = tr[tr.length - 1]
+              if (prev && Math.abs(prev.rpm - rpm) <= L.rpmMax / 600) tr[tr.length - 1] = { rpm, amp }
+              else tr.push({ rpm, amp })
               if (tr.length > 3000) tr.shift()
             }
-            r.max = 0
+            r.hx = 0
+            r.hz = 0
             r.last = s.t
           }
         }
       }
 
       const rpmNow = wToRpm(s.w)
-      const ampNow = steadyAmp(L.mach, L.fnd, s.w)
-      const ampTgt = steadyAmp(L.mach, L.fnd, rpmToW(Math.max(L.p.rpm, 1)))
+      const stNow = steady3(L.sys, L.mach, s.w)
+      const stTgt = steady3(L.sys, L.mach, rpmToW(Math.max(L.p.rpm, 1)))
       const [F1t, F2t] = forceHarmonics(L.mach, Math.max(s.w, rpmToW(L.p.rpm)))
+      const fRot = L.mach.kind === 'rotasi' ? F1t : L.mach.mRot * L.mach.r * Math.max(s.w, rpmToW(L.p.rpm)) ** 2
+      const [bx, bz] = bearing(L.sys, s.q)
       // panggung
       const sc = stageRef.current
       if (sc) {
         const { w: cw, h: ch, ctx } = fitCanvas(sc)
-        const amp = Math.max(ampNow.amp, ampTgt.amp, Math.abs(s.u), 1e-7)
+        const amp = Math.max(stNow.hx, stNow.hz, stTgt.hx, stTgt.hz, Math.abs(bx), Math.abs(bz), 1e-7)
         const tg = targetScale(amp)
         view.current = view.current === 0 || tg < view.current ? tg : view.current + (tg - view.current) * 0.02
-        const F = machineForce(L.mach, s.th, s.w, 0)
+        const [Fx, Fz] = machineForces(L.mach, s.th, s.w, 0)
         drawStage(ctx, cw, ch, {
           setup: L.setup,
           fd: L.p.fd,
-          u: s.u,
+          x: s.q[0],
+          z: s.q[1],
+          psi: s.q[2],
           th: s.th,
           rpm: rpmNow,
           rpmTarget: L.p.rpm,
           rpmMax: L.rpmMax,
-          rpmN: L.rpmN,
-          fRel: F1t + F2t > 0 ? F / (F1t + F2t) : 0,
+          bands: L.bands.map((b) => ({ rpm: b.rpm, color: b.arc })),
+          bands2: L.bands2.map((b) => ({ rpm: b.rpm, color: b.arc })),
+          fRel: [fRot > 0 ? Fx / (F1t + F2t) : 0, F1t + F2t > 0 ? Fz / (F1t + F2t) : 0],
           r: L.mach.r,
           l: L.mach.l,
+          L: L.p.L,
+          Hb: L.p.Hb,
+          hs: L.p.hs,
+          ex: L.p.ex,
+          zc: L.sys.zc,
           scale: view.current,
-          level: Math.min(1, (ampNow.amp * s.w) / 0.01),
+          orbit: orbit.current,
+          level: Math.min(1, stNow.v / 0.01),
         })
       }
       // grafik waktu
       const pc = plotRef.current
       if (pc) {
         const { w: cw, h: ch, ctx } = fitCanvas(pc)
+        const extra = [{ samples: histF.current, color: C.red, dash: [5, 4], label: 'Fz(t)/kz' }]
+        if (L.tanah) extra.unshift({ samples: histX.current, color: '#661465', dash: [], label: 'horizontal' })
         drawPlot(
           ctx,
           cw,
@@ -193,13 +269,12 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
             factor: 1e6,
             unit: 'µm',
             name: 'u',
-            mainLabel: 'simpangan pondasi',
+            mainLabel: 'vertikal',
             peaks: [],
             showAmplitude: false,
             showPeriod: false,
             envelope: null,
-            extra: [{ samples: histF.current, color: C.red, dash: [5, 4], label: 'F(t)/k' }],
-            hlines: s.w > 0 ? [{ v: ampNow.amp, color: C.steel, label: '±amplitudo tunak teori' }] : [],
+            extra,
           },
           plotScale.current,
         )
@@ -208,22 +283,24 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
       const rc = respRef.current
       if (rc) {
         const { w: cw, h: ch, ctx } = fitCanvas(rc)
+        const curves = [{ fn: L.table.hz, color: C.navy, label: 'vertikal di bantalan', trace: trace.current.hz }]
+        if (L.tanah) curves.push({ fn: L.table.hx, color: '#661465', label: 'horizontal di bantalan', trace: trace.current.hx })
         respLayout.current = drawResponse(ctx, cw, ch, {
-          curve: (rpm) => steadyAmp(L.mach, L.fnd, rpmToW(rpm)).amp,
+          curves,
+          bands: L.bands,
+          bands2: L.bands2,
           rpmMax: L.rpmMax,
-          rpmN: L.rpmN,
-          torak: L.setup === 'torak',
           rpm: rpmNow,
           target: L.p.rpm,
-          trace: trace.current,
           vLim: V_LIM,
         })
       }
 
       if (now - lastRead > 120) {
         lastRead = now
-        const tr = trace.current
-        setRead({ rpm: rpmNow, t: s.t, amp: tr.length ? tr[tr.length - 1].amp : null, u: s.u })
+        const tx = trace.current.hx
+        const tz = trace.current.hz
+        setRead({ rpm: rpmNow, t: s.t, hx: tx.length ? tx[tx.length - 1].amp : null, hz: tz.length ? tz[tz.length - 1].amp : null })
       }
       raf = requestAnimationFrame(frame)
     }
@@ -231,7 +308,6 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  // pilih putaran kerja dengan menggeser di grafik respons
   const respDrag = useRef(false)
   const setRpmFromPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const l = respLayout.current
@@ -243,16 +319,18 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
 
   const set = (key: Exclude<keyof Params, 'fd'>) => (v: number) => setP((old) => ({ ...old, [key]: v }))
   const wOp = rpmToW(p.rpm)
-  const op = steadyAmp(mach, fnd, wOp)
+  const op = steady3(sys, mach, wOp)
   const [F1, F2] = forceHarmonics(mach, wOp)
-  const vPeak = wOp * op.X1 + 2 * wOp * op.X2
-  const sev = severity(vPeak * 1000)
-  const beta = wOp / wn
-  const inBand = (b: number) => b >= 0.8 && b <= 1.25
-  const warn = inBand(beta) ? 'Putaran kerja di zona resonansi (±20% fn)!' : setup === 'torak' && inBand(2 * beta) ? 'Harmonik kedua (2ω) di zona resonansi!' : null
+  const sev = severity(op.v * 1000)
+  const warns: string[] = []
+  for (const m of modes) {
+    const b = wOp / m.w
+    if (b >= 0.8 && b <= 1.25) warns.push(`Putaran kerja di zona resonansi mode ${m.kind} (±20%)!`)
+    if (setup === 'torak' && m.kind === 'vertikal' && 2 * b >= 0.8 && 2 * b <= 1.25) warns.push('Harmonik kedua (2ω) di zona resonansi vertikal!')
+  }
+  const atOp = Math.abs(read.rpm - p.rpm) < 5
   const um = (v: number) => `${(v * 1e6).toFixed(v * 1e6 < 10 ? 2 : 1)} µm`
   const kN = (v: number) => `${(v / 1000).toFixed(v < 1e4 ? 2 : 1)} kN`
-  const tanah = p.fd === 'tanah'
 
   return (
     <div className="room">
@@ -276,25 +354,25 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
       <div className="room-grid">
         <section className="stage-col">
           <div className="card stage-card">
-            <canvas ref={stageRef} className="stage" style={{ height: 380 }} />
+            <canvas ref={stageRef} className="stage" style={{ height: 400 }} />
             <div className="stage-tip wide-only">Gerak lambat {speed}× — putaran & getaran digambar pada waktu simulasi.</div>
           </div>
           <div className="card plot-card">
             <div className="plot-head">
-              <b>Simpangan vertikal pondasi terhadap waktu</b>
+              <b>Simpangan di bantalan terhadap waktu</b>
               <small style={{ color: 'var(--mute)' }}>t = {read.t.toFixed(3)} s (waktu simulasi)</small>
             </div>
             <canvas ref={plotRef} className="plot" />
           </div>
           <div className="card plot-card">
             <div className="plot-head">
-              <b>Amplitudo terhadap putaran — klik Start untuk merekam jejak run-up</b>
+              <b>Amplitudo di bantalan terhadap putaran — klik Start untuk merekam jejak run-up</b>
               <small style={{ color: 'var(--mute)' }}>geser untuk memilih putaran kerja</small>
             </div>
             <canvas
               ref={respRef}
               className="plot"
-              style={{ height: 300, cursor: 'ew-resize', touchAction: 'none' }}
+              style={{ height: 320, cursor: 'ew-resize', touchAction: 'none' }}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId)
                 respDrag.current = true
@@ -328,7 +406,7 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
                 <option value={0.01}>0,01×</option>
               </select>
             </div>
-            <Slider label="Putaran kerja" symbol="n" unit="rpm" value={p.rpm} {...RANGES.rpm} max={rpmMax} onChange={set('rpm')} hint={`f = ${(p.rpm / 60).toFixed(2)} Hz · β = ω/ωn = ${beta.toFixed(2)}`} />
+            <Slider label="Putaran kerja" symbol="n" unit="rpm" value={p.rpm} {...RANGES.rpm} max={rpmMax} onChange={set('rpm')} hint={`f = ${(p.rpm / 60).toFixed(2)} Hz`} />
             <Slider label="Laju start/stop" symbol="ṅ" unit="rpm/s" value={p.rate} {...RANGES.rate} onChange={set('rate')} />
           </div>
 
@@ -340,9 +418,15 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
             ) : (
               <>
                 <Slider label="Massa bolak-balik" symbol="m_rec" unit="kg" value={p.mRec} {...RANGES.mRec} onChange={set('mRec')} hint="torak + ⅓ batang penghubung" />
-                <Slider label="Massa berputar" symbol="m_rot" unit="kg" value={p.mRot} {...RANGES.mRot} onChange={set('mRot')} hint="engkol tak seimbang + ⅔ batang" />
+                <Slider label="Massa berputar" symbol="m_rot" unit="kg" value={p.mRot} {...RANGES.mRot} onChange={set('mRot')} hint="engkol tak seimbang + ⅔ batang — juga memberi gaya horizontal" />
                 <Slider label="Jari-jari engkol" symbol="r" unit="cm" value={p.r} {...RANGES.r} onChange={set('r')} />
                 <Slider label="Rasio batang" symbol="l/r" unit="" value={p.lr} {...RANGES.lr} onChange={set('lr')} />
+              </>
+            )}
+            {tanah && (
+              <>
+                <Slider label="Tinggi poros di atas blok" symbol="h_s" unit="m" value={p.hs} {...RANGES.hs} onChange={set('hs')} hint="lengan momen gaya horizontal → rocking" />
+                <Slider label="Offset poros dari pusat blok" symbol="e_x" unit="m" value={p.ex} {...RANGES.ex} onChange={set('ex')} hint="gaya vertikal eksentris → rocking" />
               </>
             )}
           </div>
@@ -352,15 +436,17 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
             <div style={{ marginBottom: 8 }}>
               <Segmented value={p.fd} options={FNDS.map((f) => ({ id: f.id, label: f.label, title: f.hint }))} onChange={(v: FndKind) => setP({ ...p, fd: v })} />
             </div>
-            <Slider label={tanah ? 'Massa blok' : 'Massa pelat meja'} symbol="m_p" unit="ton" value={p.Mb} {...RANGES.Mb} onChange={set('Mb')} />
             {tanah ? (
               <>
-                <Slider label="Luas dasar blok" symbol="A" unit="m²" value={p.A} {...RANGES.A} onChange={set('A')} hint={`r₀ = √(A/π) = ${fnd.r0.toFixed(2)} m`} />
+                <Slider label="Panjang blok ⊥ poros" symbol="L" unit="m" value={p.L} {...RANGES.L} onChange={set('L')} hint="menentukan kekakuan rocking (∝ L³)" />
+                <Slider label="Lebar blok ∥ poros" symbol="B" unit="m" value={p.B} {...RANGES.B} onChange={set('B')} />
+                <Slider label="Tebal blok" symbol="H" unit="m" value={p.Hb} {...RANGES.Hb} onChange={set('Hb')} hint={`massa blok ${(sys.Mb / 1000).toFixed(1)} ton (beton 2,4 t/m³)`} />
                 <Slider label="Modulus geser tanah" symbol="G" unit="MPa" value={p.G} {...RANGES.G} onChange={set('G')} hint="lempung lunak ≈ 10–20 · pasir padat ≈ 50–100" />
                 <Slider label="Rasio Poisson" symbol="ν" unit="" value={p.nu} {...RANGES.nu} onChange={set('nu')} />
               </>
             ) : (
               <>
+                <Slider label="Massa pelat meja" symbol="m_p" unit="ton" value={p.Mb} {...RANGES.Mb} onChange={set('Mb')} />
                 <Slider label="Kekakuan vertikal" symbol="k" unit="MN/m" value={p.k} {...RANGES.k} onChange={set('k')} />
                 <Slider label="Rasio redaman" symbol="ζ" unit="" value={p.z} {...RANGES.z} onChange={set('z')} />
               </>
@@ -368,30 +454,42 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
           </div>
 
           <div className="card">
-            <h3>Hasil pada putaran kerja</h3>
-            {warn && (
-              <p style={{ color: '#b5452f', fontWeight: 600, margin: '0 0 8px', fontSize: 13 }}>
-                ⚠ {warn}
-              </p>
-            )}
+            <h3>Mode getar pondasi</h3>
             <table className="readout">
               <tbody>
                 <tr>
-                  <th>fn pondasi</th>
-                  <td>
-                    {(wn / (2 * Math.PI)).toFixed(2)} Hz <small>({Math.round(rpmN)} rpm)</small>
-                  </td>
+                  <th>Mode</th>
+                  <th>f (Hz)</th>
+                  <th>rpm</th>
                   <th>ζ</th>
-                  <td>
-                    {z.toFixed(3)} {tanah && <small>(Bz {fnd.Bz?.toFixed(2)})</small>}
-                  </td>
                 </tr>
-                <tr>
-                  <th>k / M</th>
-                  <td colSpan={3}>
-                    {(fnd.k / 1e6).toFixed(0)} MN/m · {(fnd.M / 1000).toFixed(1)} ton
-                  </td>
-                </tr>
+                {modes.map((m) => (
+                  <tr key={m.kind}>
+                    <th style={{ color: MODE_COLOR[m.kind].line }}>{m.kind}</th>
+                    <td>{(m.w / (2 * Math.PI)).toFixed(2)}</td>
+                    <td>{Math.round(wToRpm(m.w))}</td>
+                    <td>{m.zeta.toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {tanah && (
+              <p className="slider-hint" style={{ marginTop: 6 }}>
+                CG {sys.zc.toFixed(2)} m di atas dasar · r₀ = {sys.r0.toFixed(2)} m · r₀ψ = {sys.r0p.toFixed(2)} m · Bz = {sys.Bz.toFixed(2)} · Bψ = {sys.Bp.toFixed(2)}. Mode
+                geser–rocking terkopel karena CG berada di atas dasar.
+              </p>
+            )}
+          </div>
+
+          <div className="card">
+            <h3>Hasil pada putaran kerja</h3>
+            {warns.map((w) => (
+              <p key={w} style={{ color: '#b5452f', fontWeight: 600, margin: '0 0 6px', fontSize: 13 }}>
+                ⚠ {w}
+              </p>
+            ))}
+            <table className="readout">
+              <tbody>
                 <tr>
                   <th>Gaya F₁ (ω)</th>
                   <td>{kN(F1)}</td>
@@ -399,29 +497,52 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
                   <td>{setup === 'torak' ? kN(F2) : '—'}</td>
                 </tr>
                 <tr>
-                  <th>Amplitudo teori</th>
-                  <td>{um(op.amp)}</td>
-                  <th>Terukur (1 putaran)</th>
-                  <td>{read.amp !== null && Math.abs(read.rpm - p.rpm) < 5 ? um(read.amp) : '—'}</td>
+                  <th>Vertikal bantalan</th>
+                  <td>{um(op.hz)}</td>
+                  <th>terukur</th>
+                  <td>{atOp && read.hz !== null ? um(read.hz) : '—'}</td>
                 </tr>
+                {tanah && (
+                  <tr>
+                    <th>Horizontal bantalan</th>
+                    <td>{um(op.hx)}</td>
+                    <th>terukur</th>
+                    <td>{atOp && read.hx !== null ? um(read.hx) : '—'}</td>
+                  </tr>
+                )}
+                {tanah && (
+                  <tr>
+                    <th>Rocking ψ</th>
+                    <td>{(op.psi * 1e6).toFixed(1)} µrad</td>
+                    <th>Geser dasar</th>
+                    <td>{um(op.xb)}</td>
+                  </tr>
+                )}
                 <tr>
                   <th>Kecepatan puncak</th>
-                  <td>
-                    {(vPeak * 1000).toFixed(2)} mm/s
-                  </td>
+                  <td>{(op.v * 1000).toFixed(2)} mm/s</td>
                   <th>Kategori</th>
                   <td style={{ color: sev.color }}>{sev.label}</td>
                 </tr>
                 <tr>
-                  <th>Gaya ke {tanah ? 'tanah' : 'kolom'}</th>
-                  <td>{kN(op.FT)}</td>
-                  <th>TR = F_T/F</th>
-                  <td>{(op.FT / (F1 + F2)).toFixed(2)}</td>
+                  <th>Gaya vertikal ke {tanah ? 'tanah' : 'kolom'}</th>
+                  <td>{kN(op.V)}</td>
+                  <th>{tanah ? 'Geser ke tanah' : ''}</th>
+                  <td>{tanah ? kN(op.H) : ''}</td>
                 </tr>
+                {tanah && (
+                  <tr>
+                    <th>Momen guling ke tanah</th>
+                    <td colSpan={3}>{(op.Mo / 1000).toFixed(2)} kN·m</td>
+                  </tr>
+                )}
               </tbody>
             </table>
             <p className="slider-hint" style={{ marginTop: 6 }}>
-              Hanya mode vertikal (SDOF). Kategori dari kecepatan puncak bersifat indikatif — desain nyata memakai kriteria pabrikan / ISO 10816 / ACI 351.3R.
+              {tanah
+                ? 'Blok kaku 3 DOF (geser, vertikal, rocking), konstanta tanah Lysmer/Hall tak bergantung frekuensi, tanpa penanaman. '
+                : 'Pondasi meja: hanya mode vertikal. '}
+              Kategori dari kecepatan puncak bersifat indikatif — desain nyata memakai kriteria pabrikan / ISO 10816 / ACI 351.3R.
             </p>
           </div>
         </aside>
@@ -440,44 +561,52 @@ function Notes({ setup, tanah }: { setup: Setup; tanah: boolean }) {
         <ul>
           {setup === 'rotasi' ? (
             <li>
-              <b>Mesin rotasi:</b> massa tak seimbang m·e berputar → gaya F = m·e·ω²·cos ωt. Gaya naik dengan kuadrat putaran, sehingga
-              di atas resonansi amplitudo tidak turun ke nol melainkan menuju m·e/M (massa pondasi “melawan” rotor).
+              <b>Mesin rotasi:</b> massa tak seimbang m·e berputar → gaya berputar m·e·ω²: komponen vertikal cos ωt dan horizontal sin ωt. Gaya naik
+              dengan kuadrat putaran.
             </li>
           ) : (
             <li>
-              <b>Mesin torak:</b> torak bergerak x = r·cos θ + √(l² − r²sin²θ). Gayanya ≈ (m_rec + m_rot)·r·ω²·cos ωt (primer) + m_rec·r·ω²·(r/l)·cos 2ωt
-              (sekunder). Ada dua resonansi berbahaya: ω = ωn dan 2ω = ωn.
+              <b>Mesin torak:</b> gaya vertikal ≈ (m_rec + m_rot)·r·ω²·cos ωt + m_rec·r·ω²·(r/l)·cos 2ωt, ditambah gaya horizontal m_rot·r·ω²·sin ωt
+              dari engkol yang tak seimbang.
             </li>
           )}
-          <li>
-            <b>Start & stop:</b> mesin yang bekerja di atas resonansi pasti <b>melewati</b> resonansi saat run-up dan coast-down. Laju start yang cepat
-            membuat puncak lewat lebih kecil daripada amplitudo tunak resonansi.
-          </li>
           {tanah ? (
-            <li>
-              <b>Pondasi blok di atas tanah:</b> tanah berperilaku seperti pegas kz = 4Gr₀/(1−ν) dan peredam cz = 3,4r₀²√(ρG)/(1−ν). Redaman ini
-              adalah <b>redaman radiasi</b> — energi dibawa gelombang yang menjalar menjauh di tanah — dan untuk arah vertikal nilainya besar.
-            </li>
+            <>
+              <li>
+                <b>Rocking:</b> gaya horizontal bekerja setinggi poros, jauh di atas dasar → momen guling. Bersama gaya vertikal yang eksentris, momen
+                ini menggoyang blok. Geser dan rocking <b>terkopel</b> karena titik berat berada di atas bidang dasar, menghasilkan dua mode
+                “geser–rocking”.
+              </li>
+              <li>
+                <b>Tanah:</b> kz = 4Gr₀/(1−ν), kx = 32(1−ν)Gr₀/(7−8ν), kψ = 8Gr₀ψ³/(3(1−ν)). Redaman radiasi rocking (analog Hall) jauh lebih kecil
+                daripada vertikal, sehingga resonansi rocking lebih tajam dan sering menentukan.
+              </li>
+              <li>
+                Yang dinilai adalah getaran di <b>bantalan</b>: horizontal = x − h·ψ (terhadap CG), vertikal = z + e·ψ. Orbit oranye di panggung
+                menunjukkan lintasan bantalan selama satu putaran.
+              </li>
+            </>
           ) : (
             <li>
-              <b>Pondasi meja (table-top):</b> redaman struktur beton hanya ≈ 2%, sehingga resonansi sangat tajam. Aturan praktis: fn jauh dari
-              putaran kerja (kurang dari 0,8× atau lebih dari 1,25×).
+              <b>Pondasi meja (table-top):</b> redaman struktur beton hanya ≈ 2%, sehingga resonansi sangat tajam. Di Room ini meja hanya dimodelkan
+              arah vertikal.
             </li>
           )}
           <li>
-            Kriteria desain umum: amplitudo/kecepatan getaran dalam batas pabrikan dan rasio frekuensi di luar ±20% resonansi (ACI 351.3R).
+            <b>Start & stop:</b> mesin yang bekerja di atas resonansi pasti melewati resonansi saat run-up dan coast-down. Laju start yang cepat membuat
+            puncak lewat lebih kecil daripada amplitudo tunak resonansi.
           </li>
         </ul>
       </div>
       <div className="card">
         <h3>Coba ini</h3>
         <ol>
-          <li>Klik Start dan ikuti jejak hijau di grafik amplitudo: puncak saat melewati resonansi, lalu turun ke amplitudo kerja.</li>
-          <li>Ubah laju start/stop menjadi 50 rpm/s lalu 2000 rpm/s: makin cepat, makin kecil puncak lewat resonansi.</li>
-          <li>Pindah ke “Meja / struktur” dan ulangi: resonansi jauh lebih tajam karena tidak ada redaman radiasi.</li>
-          <li>Geser putaran kerja ke pita merah: muncul peringatan. Atasi dengan mengubah massa blok atau kekakuan (tuning) — bukan memperbesar mesin.</li>
-          {setup === 'torak' && <li>Cari putaran saat 2ω = ωn (pita oranye): pondasi bergetar dua kali per putaran engkol.</li>}
-          {setup === 'rotasi' && <li>Gandakan massa blok: fn turun dan amplitudo di atas resonansi mengecil (m·e/M).</li>}
+          <li>Klik Start: jejak run-up melewati beberapa puncak — satu untuk tiap mode yang terlewati.</li>
+          {tanah && <li>Naikkan tinggi poros h_s: amplitudo horizontal naik dan mode geser–rocking 1 turun (lengan momen & inersia membesar).</li>}
+          {tanah && <li>Perpanjang blok L (⊥ poros): kekakuan rocking naik ∝ L³ — cara paling efektif menjinakkan rocking.</li>}
+          {tanah && <li>Geser offset e_x: gaya vertikal kini juga memicu rocking, orbit bantalan memiring.</li>}
+          <li>Geser putaran kerja ke salah satu pita berwarna: muncul peringatan resonansi untuk mode tersebut.</li>
+          {setup === 'torak' && <li>Cari putaran saat 2ω = ωn vertikal (pita oranye): pondasi bergetar dua kali per putaran engkol.</li>}
         </ol>
       </div>
     </div>

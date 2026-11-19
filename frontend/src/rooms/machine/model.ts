@@ -1,5 +1,6 @@
 // Model Room Machine Foundation: setup (jenis mesin) + jenis pondasi + parameter (tersimpan di URL).
-import { lysmer, massRatio, type Foundation, type Machine, type MachineKind } from './physics'
+import { type Foundation, type Machine, type MachineKind } from './physics'
+import { blockSystem, verticalSystem, type Sys3 } from './rocking'
 
 export type Setup = MachineKind
 export type FndKind = 'tanah' | 'meja'
@@ -14,8 +15,12 @@ export interface Params {
   lr: number // l/r
   rpm: number // putaran kerja (rpm)
   rate: number // laju start/stop (rpm/s)
-  Mb: number // massa blok / pelat meja (ton)
-  A: number // luas dasar blok (m²)
+  Mb: number // massa pelat meja (ton) — pondasi meja
+  L: number // panjang blok tegak lurus poros (m)
+  B: number // lebar blok searah poros (m)
+  Hb: number // tebal blok (m)
+  hs: number // tinggi poros di atas muka blok (m)
+  ex: number // offset poros dari pusat blok (m)
   G: number // modulus geser tanah (MPa)
   nu: number
   k: number // kekakuan meja (MN/m)
@@ -48,7 +53,11 @@ export const RANGES: Record<Exclude<keyof Params, 'fd'>, Range> = {
   rpm: { min: 0, max: 3600, step: 10 },
   rate: { min: 50, max: 2000, step: 10 },
   Mb: { min: 5, max: 400, step: 1 },
-  A: { min: 4, max: 80, step: 0.5 },
+  L: { min: 2, max: 12, step: 0.1 },
+  B: { min: 2, max: 12, step: 0.1 },
+  Hb: { min: 0.5, max: 4, step: 0.05 },
+  hs: { min: 0.3, max: 3, step: 0.05 },
+  ex: { min: -2, max: 2, step: 0.05 },
   G: { min: 10, max: 200, step: 1 },
   nu: { min: 0.25, max: 0.45, step: 0.01 },
   k: { min: 10, max: 3000, step: 10 },
@@ -69,7 +78,11 @@ export function defaults(s: Setup): Params {
     rpm: s === 'rotasi' ? 1500 : 600,
     rate: s === 'rotasi' ? 300 : 120,
     Mb: 60,
-    A: 20,
+    L: 5,
+    B: 4,
+    Hb: 1.25,
+    hs: 1,
+    ex: 0,
     G: 40,
     nu: 0.35,
     k: 400,
@@ -83,16 +96,22 @@ export function machineOf(s: Setup, p: Params): Machine {
   return { kind: s, me: p.me / 1000, mRec: p.mRec, mRot: p.mRot, r: p.r / 100, l: (p.r / 100) * p.lr }
 }
 
-export function foundationOf(p: Params): Foundation & { r0: number; Bz: number | null } {
-  const M = (p.Mm + p.Mb) * 1000
+export interface Fnd extends Foundation {
+  /** Sistem 3DOF (geser–vertikal–rocking); pondasi meja: geser & rocking dikunci. */
+  sys: Sys3
+  Bz: number | null
+}
+
+/** Pondasi: blok di atas tanah (3DOF, massa blok dari dimensi) atau meja (SDOF vertikal). */
+export function foundationOf(p: Params): Fnd {
   if (p.fd === 'tanah') {
-    const soil = { G: p.G * 1e6, nu: p.nu, rho: RHO }
-    const r0 = Math.sqrt(p.A / Math.PI)
-    const { k, c } = lysmer(soil, r0)
-    return { M, k, c, r0, Bz: massRatio(soil, r0, M) }
+    const sys = blockSystem({ L: p.L, B: p.B, H: p.Hb }, { Mm: p.Mm * 1000, hs: p.hs, ex: p.ex }, { G: p.G * 1e6, nu: p.nu, rho: RHO })
+    return { M: sys.M, k: sys.kz, c: sys.cz, sys, Bz: sys.Bz }
   }
+  const M = (p.Mm + p.Mb) * 1000
   const k = p.k * 1e6
-  return { M, k, c: 2 * p.z * Math.sqrt(k * M), r0: 0, Bz: null }
+  const c = 2 * p.z * Math.sqrt(k * M)
+  return { M, k, c, sys: verticalSystem(M, k, c), Bz: null }
 }
 
 /** Kategori getaran indikatif dari kecepatan puncak (mm/s) — bukan pengganti kriteria pabrikan/standar. */
@@ -123,11 +142,11 @@ export function parseQuery(q: string): { setup: Setup; params: Params } {
 }
 
 export function toQuery(setup: Setup, p: Params): string {
-  const keys: Exclude<keyof Params, 'fd'>[] = ['Mm', 'rpm', 'rate', 'Mb']
+  const keys: Exclude<keyof Params, 'fd'>[] = ['Mm', 'rpm', 'rate']
   if (setup === 'rotasi') keys.push('me')
   else keys.push('mRec', 'mRot', 'r', 'lr')
-  if (p.fd === 'tanah') keys.push('A', 'G', 'nu')
-  else keys.push('k', 'z')
+  if (p.fd === 'tanah') keys.push('L', 'B', 'Hb', 'hs', 'ex', 'G', 'nu')
+  else keys.push('Mb', 'k', 'z')
   const sp = new URLSearchParams({ setup, fd: p.fd })
   for (const k of keys) sp.set(k, String(p[k]))
   return sp.toString()
