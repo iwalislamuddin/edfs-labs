@@ -42,6 +42,11 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   θ berlawanan jarum jam, Mohr digambar dengan τ positif ke bawah (X = (σx, τxy), Y = (σy, −τxy)) sehingga titik berputar
   2θ searah elemen. `stage.ts`: elemen kiri (diputar / terdeformasi + gauge / kubus 3D) + lingkaran Mohr kanan
   (bertumpuk vertikal bila lebar < 560 px), skala Mohr membesar seketika dan mengecil perlahan; `drawCurves` σ(θ).
+  Room Resonance (`rooms/resonance/`, slug `resonance`): `physics.ts` (SDOF + eksitasi harmonik dengan fase gaya ψ
+  diintegrasikan, Rd/φ/TR, solusi analitis lengkap, `measure()` = simulasi tak berdimensi sampai tunak) diuji di
+  `physics.test.ts`; setup Gaya Harmonik / Eksitasi Dasar (u relatif, x = u + ug; "dari diam" = diam mutlak, v = −ug0·ω).
+  `freq.ts` grafik Rd|TR + φ vs β (geser untuk set ω), titik terukur hijau dicatat otomatis saat tunak + "Sapu frekuensi".
+  `stage.ts` massa–pegas–peredam horizontal, meja getar, diagram fasor. `lab/plot.ts` punya opsi `hlines`.
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -59,6 +64,8 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
 - Live: **Room Element** (tab Tegangan & Mohr / Regangan & Poisson / Tiga Dimensi): elemen bisa diputar dengan drag
   (di elemen atau titik X′ di lingkaran Mohr), 6 kasus bawaan, tabel rumus vs pindai θ, grafik σ(θ).
   Lanjutan: rosette input (ε0/ε45/ε90 → tegangan), kriteria keruntuhan Mohr–Coulomb (jembatan ke Zone Tanah).
+- Live: **Room Resonance** (Fase 2): transien + tunak, fasor, Rd/TR & fase teori vs terukur, isolasi β > √2.
+  Lanjutan: massa tak seimbang (mesin, p0 = me·e·ω²), sapuan chirp kontinu, TMD (jembatan ke Shear Building/Earthquake).
 - Belum: Room lain (Fase 2 Material, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".

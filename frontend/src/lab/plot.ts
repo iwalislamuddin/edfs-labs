@@ -20,6 +20,8 @@ export interface PlotOptions {
   extra?: { samples: Sample[]; color: string; dash?: number[]; label: string }[]
   /** Label seri utama untuk legenda (muncul bila ada seri tambahan). */
   mainLabel?: string
+  /** Garis datar ±v (satuan SI), mis. amplitudo tunak teoretis — opsional. */
+  hlines?: { v: number; color: string; label: string }[]
 }
 
 function niceStep(range: number, target = 4) {
@@ -68,6 +70,7 @@ export function drawPlot(
   for (const s of visible) maxAbs = Math.max(maxAbs, Math.abs(s.u * o.factor))
   const extras = (o.extra ?? []).map((e) => ({ ...e, visible: e.samples.filter((s) => s.t >= t0 - 0.05) }))
   for (const e of extras) for (const s of e.visible) maxAbs = Math.max(maxAbs, Math.abs(s.u * o.factor))
+  for (const l of o.hlines ?? []) maxAbs = Math.max(maxAbs, Math.abs(l.v * o.factor))
   scale.update(Math.max(maxAbs * 1.2, o.unit === '°' ? 5 : 0.5))
   const yMax = scale.y
 
@@ -142,6 +145,26 @@ export function drawPlot(
       ctx.stroke()
     }
     ctx.setLineDash([])
+  }
+
+  // garis datar ±v
+  for (const l of o.hlines ?? []) {
+    const a = Math.abs(l.v * o.factor)
+    ctx.setLineDash([6, 4])
+    ctx.strokeStyle = l.color
+    ctx.lineWidth = 1.2
+    for (const v of [a, -a]) {
+      ctx.beginPath()
+      ctx.moveTo(L, Y(v))
+      ctx.lineTo(L + pw, Y(v))
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+    ctx.fillStyle = l.color
+    ctx.font = FONT
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'top'
+    ctx.fillText(l.label, L + pw - 6, Y(-a) + 3)
   }
 
   // seri tambahan (di bawah kurva utama)
