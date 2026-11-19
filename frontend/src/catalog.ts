@@ -26,7 +26,7 @@ export const zones: Zone[] = [
       { slug: 'pendulum', name: 'Pendulum', desc: 'Bandul sederhana, sudut besar vs kecil, bandul ganda (chaos), bandul fisik.', state: 'live' },
       { slug: 'resonance', name: 'Resonance', desc: 'Gaya harmonik dan eksitasi dasar: transien, resonansi, Rd, fase, transmisibilitas.', state: 'live' },
       { slug: 'shear-building', name: 'Shear Building', desc: 'Portal geser 2–5 lantai: mode getar, massa efektif, lantai lunak, resonansi gerak tanah.', state: 'live' },
-      { slug: 'earthquake', name: 'Earthquake', desc: 'Respons SDOF terhadap rekaman gempa, spektrum respons.', state: 'soon' },
+      { slug: 'earthquake', name: 'Earthquake', desc: 'Gempa sintetis, spektrum respons titik demi titik vs SNI 1726, isolasi dasar.', state: 'live' },
     ],
   },
   {
