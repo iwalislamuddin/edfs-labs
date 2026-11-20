@@ -3,6 +3,8 @@
 // dengan reaksi tanah di pusat dasar: H = kx·xb + cx·ẋb (xb = x + zc·ψ), V = kz·z + cz·ż, Mψ = kψ·ψ + cψ·ψ̇.
 // Konvensi: x ke kanan, z ke atas, ψ berlawanan jarum jam. Titik (dx, dz) relatif CG bergeser (x − dz·ψ, z + dx·ψ).
 // Analog Lysmer/Hall (Richart–Hall–Woods), konstanta tidak bergantung frekuensi; tanpa penanaman (embedment).
+// Pondasi meja (table-top): pelat kaku di atas 4 kolom beton jepit–jepit setinggi hc — sway + vertikal + rocking,
+// redaman modal ζ sama untuk semua mode (lihat tableSystem).
 // Fisika murni, diuji di rocking.test.ts.
 
 import { jacobiEigen, type Mat } from '../../lab/mdof'
@@ -45,46 +47,12 @@ export interface Sys3 {
   Mb: number
   Bz: number
   Bp: number
-  /** true: geser & rocking dikunci (pondasi meja, hanya vertikal). */
-  lock?: boolean
+  /** Kedalaman bidang dasar di bawah CG untuk momen guling (blok: dasar blok, meja: kaki kolom). */
+  zb: number
 }
 
-/** Sistem hanya-vertikal (pondasi meja): x dan ψ dikunci. */
-export function verticalSystem(M: number, k: number, c: number): Sys3 {
-  return {
-    M,
-    Ic: 1,
-    m: [M, M, 1],
-    K: [
-      [1, 0, 0],
-      [0, k, 0],
-      [0, 0, 1],
-    ],
-    C: [
-      [0, 0, 0],
-      [0, c, 0],
-      [0, 0, 0],
-    ],
-    zc: 0,
-    dx: 0,
-    dz: 0,
-    kx: 0,
-    cx: 0,
-    kz: k,
-    cz: c,
-    kp: 0,
-    cp: 0,
-    r0: 0,
-    r0p: 0,
-    Mb: 0,
-    Bz: 0,
-    Bp: 0,
-    lock: true,
-  }
-}
-
-/** Membangun sistem 3DOF blok + mesin di atas tanah. */
-export function blockSystem(b: Block, pl: Placement, s: Soil): Sys3 {
+/** Massa, CG, dan inersia blok/pelat beton + mesin terpusat di ketinggian poros. */
+export function massProps(b: Block, pl: Placement) {
   const Mb = RHO_C * b.L * b.B * b.H
   const M = Mb + pl.Mm
   const zm = b.H + pl.hs
@@ -93,6 +61,12 @@ export function blockSystem(b: Block, pl: Placement, s: Soil): Sys3 {
   // momen inersia massa terhadap sumbu sejajar poros melalui CG
   const Ic =
     (Mb * (b.L * b.L + b.H * b.H)) / 12 + Mb * ((b.H / 2 - zc) ** 2 + xc * xc) + pl.Mm * ((zm - zc) ** 2 + (pl.ex - xc) ** 2)
+  return { Mb, M, zm, zc, xc, Ic }
+}
+
+/** Membangun sistem 3DOF blok + mesin di atas tanah. */
+export function blockSystem(b: Block, pl: Placement, s: Soil): Sys3 {
+  const { Mb, M, zm, zc, xc, Ic } = massProps(b, pl)
   const I0 = Ic + M * zc * zc // terhadap sumbu di dasar
   const r0 = Math.sqrt((b.L * b.B) / Math.PI)
   const r0p = Math.pow((b.B * b.L ** 3) / (3 * Math.PI), 0.25)
@@ -134,6 +108,77 @@ export function blockSystem(b: Block, pl: Placement, s: Soil): Sys3 {
     Mb,
     Bz: ((1 - s.nu) * M) / (4 * s.rho * r0 ** 3),
     Bp,
+    zb: zc,
+  }
+}
+
+export interface Columns {
+  hc: number // tinggi bersih kolom (kaki → bawah pelat), m
+  bc: number // sisi kolom persegi, m
+  E: number // modulus elastisitas, Pa
+}
+
+/**
+ * Kekakuan 3×3 pelat kaku di atas kolom jepit–jepit, q = [x, z, ψ] di CG (zc di atas bawah pelat).
+ * Tiap kolom: ujung atas U = x + zc·ψ, kemiringan u' = −ψ; matriks ujung balok 12EI/h³·[[1, −h/2], [−h/2, h²/3]].
+ * kx = Σ12EI/h³, kz = ΣEA/h, kolom di x = ±a (rocking aksial kz·a²).
+ */
+export function tableK(kx: number, kz: number, a: number, zc: number, hc: number): Mat {
+  const e = zc + hc / 2
+  return [
+    [kx, 0, kx * e],
+    [0, kz, 0],
+    [kx * e, 0, kx * (zc * zc + hc * zc + (hc * hc) / 3) + kz * a * a],
+  ]
+}
+
+/** Redaman klasik dengan rasio ζ sama di semua mode: C = M½·V·diag(2ζω)·Vᵀ·M½. */
+export function modalDamping(m: number[], K: Mat, zeta: number): Mat {
+  const r = m.map((v) => 1 / Math.sqrt(v))
+  const { vals, vecs } = jacobiEigen(K.map((row, i) => row.map((v, j) => v * r[i] * r[j])))
+  const n = m.length
+  return Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => {
+      let c = 0
+      for (let k = 0; k < n; k++) c += vecs[i][k] * 2 * zeta * Math.sqrt(Math.max(vals[k], 0)) * vecs[j][k]
+      return c * Math.sqrt(m[i] * m[j])
+    }),
+  )
+}
+
+/** Pondasi meja: pelat L×B×H di atas 4 kolom persegi di sudut (x = ±a), mesin di atas pelat. */
+export function tableSystem(b: Block, pl: Placement, col: Columns, zeta: number): Sys3 {
+  const { Mb, M, zm, zc, xc, Ic } = massProps(b, pl)
+  const n = 4
+  const A = col.bc * col.bc
+  const I = col.bc ** 4 / 12
+  const kz = (n * col.E * A) / col.hc
+  const kx = (n * 12 * col.E * I) / col.hc ** 3
+  const a = Math.max(0.1, b.L / 2 - col.bc / 2)
+  const K = tableK(kx, kz, a, zc, col.hc)
+  const m: [number, number, number] = [M, M, Ic]
+  const C = modalDamping(m, K, zeta)
+  return {
+    M,
+    Ic,
+    m,
+    K,
+    C,
+    zc,
+    dx: pl.ex - xc,
+    dz: zm - zc,
+    kx,
+    cx: C[0][0],
+    kz,
+    cz: C[1][1],
+    kp: kz * a * a,
+    cp: 0,
+    r0: a,
+    r0p: 0,
+    Mb,
+    Bz: 0,
+    Bp: 0,
+    zb: zc + col.hc,
   }
 }
 
@@ -149,8 +194,7 @@ export function machineForces(m: Machine, th: number, w: number, a: number): [nu
 }
 
 /** Gaya umum q = [x, z, ψ] dari gaya di bantalan (dx, dz relatif CG). */
-const genForce = (s: Sys3, fx: number, fz: number): [number, number, number] =>
-  s.lock ? [0, fz, 0] : [fx, fz, s.dx * fz - s.dz * fx]
+const genForce = (s: Sys3, fx: number, fz: number): [number, number, number] => [fx, fz, s.dx * fz - s.dz * fx]
 
 export interface Mode3 {
   w: number
@@ -259,7 +303,7 @@ export function harmonics3(s: Sys3, m: Machine, w: number): { X1: Cx[]; X2: Cx[]
     F1z = [(m.mRec + m.mRot) * m.r * w * w, 0]
     F2z = [m.mRec * m.r * w * w * (m.r / m.l), 0]
   }
-  const g = (fx: Cx, fz: Cx): Cx[] => (s.lock ? [[0, 0], fz, [0, 0]] : [fx, fz, csub(cmul([s.dx, 0], fz), cmul([s.dz, 0], fx))])
+  const g = (fx: Cx, fz: Cx): Cx[] => [fx, fz, csub(cmul([s.dx, 0], fz), cmul([s.dz, 0], fx))]
   const X1 = solveC(s, w, g(F1x, F1z))
   const X2 = F2z[0] !== 0 ? solveC(s, 2 * w, g([0, 0], F2z)) : null
   return { X1, X2 }
@@ -291,15 +335,16 @@ export function steady3(s: Sys3, m: Machine, w: number): Steady3 {
     const vx = qd[0] - s.dz * qd[2]
     const vz = qd[1] + s.dx * qd[2]
     const xb = q[0] + s.zc * q[2]
-    const xbd = qd[0] + s.zc * qd[2]
     out.hx = Math.max(out.hx, Math.abs(hx))
     out.hz = Math.max(out.hz, Math.abs(hz))
     out.psi = Math.max(out.psi, Math.abs(q[2]))
     out.xb = Math.max(out.xb, Math.abs(xb))
     out.v = Math.max(out.v, Math.hypot(vx, vz))
-    out.H = Math.max(out.H, Math.abs(s.kx * xb + s.cx * xbd))
-    out.V = Math.max(out.V, Math.abs(s.kz * q[1] + s.cz * qd[1]))
-    out.Mo = Math.max(out.Mo, Math.abs(s.kp * q[2] + s.cp * qd[2]))
+    // reaksi tumpuan = K·q + C·q̇ (baris x: geser total, z: vertikal, ψ: momen terhadap CG)
+    const R = [0, 1, 2].map((i) => [0, 1, 2].reduce((acc, j) => acc + s.K[i][j] * q[j] + s.C[i][j] * qd[j], 0))
+    out.H = Math.max(out.H, Math.abs(R[0]))
+    out.V = Math.max(out.V, Math.abs(R[1]))
+    out.Mo = Math.max(out.Mo, Math.abs(R[2] - s.zb * R[0]))
   }
   return out
 }

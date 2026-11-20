@@ -1,6 +1,6 @@
 // Model Room Machine Foundation: setup (jenis mesin) + jenis pondasi + parameter (tersimpan di URL).
-import { type Foundation, type Machine, type MachineKind } from './physics'
-import { blockSystem, verticalSystem, type Sys3 } from './rocking'
+import { type Machine, type MachineKind } from './physics'
+import { blockSystem, tableSystem, type Sys3 } from './rocking'
 
 export type Setup = MachineKind
 export type FndKind = 'tanah' | 'meja'
@@ -15,15 +15,15 @@ export interface Params {
   lr: number // l/r
   rpm: number // putaran kerja (rpm)
   rate: number // laju start/stop (rpm/s)
-  Mb: number // massa pelat meja (ton) — pondasi meja
-  L: number // panjang blok tegak lurus poros (m)
-  B: number // lebar blok searah poros (m)
-  Hb: number // tebal blok (m)
+  L: number // panjang blok / pelat meja tegak lurus poros (m)
+  B: number // lebar blok / pelat searah poros (m)
+  Hb: number // tebal blok / pelat (m)
   hs: number // tinggi poros di atas muka blok (m)
   ex: number // offset poros dari pusat blok (m)
   G: number // modulus geser tanah (MPa)
   nu: number
-  k: number // kekakuan meja (MN/m)
+  hc: number // tinggi kolom meja (m)
+  bc: number // sisi kolom meja persegi (m)
   z: number // redaman meja
   sk: number // skala tampilan simpangan (px per µm); 0 = auto
 }
@@ -35,7 +35,7 @@ export const SETUPS: { id: Setup; label: string; hint: string }[] = [
 
 export const FNDS: { id: FndKind; label: string; hint: string }[] = [
   { id: 'tanah', label: 'Blok di atas tanah', hint: 'pegas & peredam tanah (analog Lysmer): redaman radiasi' },
-  { id: 'meja', label: 'Meja / struktur', hint: 'pelat beton di atas kolom (table-top): redaman struktur kecil' },
+  { id: 'meja', label: 'Meja / struktur', hint: 'pelat beton di atas 4 kolom jepit–jepit (table-top): sway, vertikal, rocking; redaman struktur kecil' },
 ]
 
 export interface Range {
@@ -53,7 +53,6 @@ export const RANGES: Record<Exclude<keyof Params, 'fd'>, Range> = {
   lr: { min: 3, max: 8, step: 0.1 },
   rpm: { min: 0, max: 3600, step: 10 },
   rate: { min: 50, max: 2000, step: 10 },
-  Mb: { min: 5, max: 400, step: 1 },
   L: { min: 2, max: 12, step: 0.1 },
   B: { min: 2, max: 12, step: 0.1 },
   Hb: { min: 0.5, max: 4, step: 0.05 },
@@ -61,7 +60,8 @@ export const RANGES: Record<Exclude<keyof Params, 'fd'>, Range> = {
   ex: { min: -2, max: 2, step: 0.05 },
   G: { min: 10, max: 200, step: 1 },
   nu: { min: 0.25, max: 0.45, step: 0.01 },
-  k: { min: 10, max: 3000, step: 10 },
+  hc: { min: 1.5, max: 10, step: 0.1 },
+  bc: { min: 0.3, max: 1.5, step: 0.05 },
   z: { min: 0.01, max: 0.1, step: 0.005 },
   sk: { min: 0, max: 20, step: 0.01 },
 }
@@ -79,7 +79,6 @@ export function defaults(s: Setup): Params {
     lr: 4,
     rpm: s === 'rotasi' ? 1500 : 600,
     rate: s === 'rotasi' ? 300 : 120,
-    Mb: 60,
     L: 5,
     B: 4,
     Hb: 1.25,
@@ -87,7 +86,8 @@ export function defaults(s: Setup): Params {
     ex: 0,
     G: 40,
     nu: 0.35,
-    k: 400,
+    hc: 4,
+    bc: 0.6,
     z: 0.02,
     sk: 0,
   }
@@ -100,27 +100,18 @@ export const SCALES = [0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20]
 export const snapScale = (pxPerUm: number) => [...SCALES].reverse().find((v) => v <= pxPerUm * 1.0001) ?? SCALES[0]
 
 export const RHO = 1800 // kg/m³ tanah
+export const E_C = 30e9 // Pa, modulus elastisitas beton kolom
 
 export function machineOf(s: Setup, p: Params): Machine {
   return { kind: s, me: p.me / 1000, mRec: p.mRec, mRot: p.mRot, r: p.r / 100, l: (p.r / 100) * p.lr }
 }
 
-export interface Fnd extends Foundation {
-  /** Sistem 3DOF (geser–vertikal–rocking); pondasi meja: geser & rocking dikunci. */
-  sys: Sys3
-  Bz: number | null
-}
-
-/** Pondasi: blok di atas tanah (3DOF, massa blok dari dimensi) atau meja (SDOF vertikal). */
-export function foundationOf(p: Params): Fnd {
-  if (p.fd === 'tanah') {
-    const sys = blockSystem({ L: p.L, B: p.B, H: p.Hb }, { Mm: p.Mm * 1000, hs: p.hs, ex: p.ex }, { G: p.G * 1e6, nu: p.nu, rho: RHO })
-    return { M: sys.M, k: sys.kz, c: sys.cz, sys, Bz: sys.Bz }
-  }
-  const M = (p.Mm + p.Mb) * 1000
-  const k = p.k * 1e6
-  const c = 2 * p.z * Math.sqrt(k * M)
-  return { M, k, c, sys: verticalSystem(M, k, c), Bz: null }
+/** Pondasi 3DOF (geser/sway–vertikal–rocking): blok di atas tanah atau pelat meja di atas kolom; massa dari dimensi. */
+export function foundationOf(p: Params): Sys3 {
+  const blk = { L: p.L, B: p.B, H: p.Hb }
+  const pl = { Mm: p.Mm * 1000, hs: p.hs, ex: p.ex }
+  if (p.fd === 'tanah') return blockSystem(blk, pl, { G: p.G * 1e6, nu: p.nu, rho: RHO })
+  return tableSystem(blk, pl, { hc: p.hc, bc: p.bc, E: E_C }, p.z)
 }
 
 /** Kategori getaran indikatif dari kecepatan puncak (mm/s) — bukan pengganti kriteria pabrikan/standar. */
@@ -154,8 +145,9 @@ export function toQuery(setup: Setup, p: Params): string {
   const keys: Exclude<keyof Params, 'fd'>[] = ['Mm', 'rpm', 'rate']
   if (setup === 'rotasi') keys.push('me')
   else keys.push('mRec', 'mRot', 'r', 'lr')
-  if (p.fd === 'tanah') keys.push('L', 'B', 'Hb', 'hs', 'ex', 'G', 'nu')
-  else keys.push('Mb', 'k', 'z')
+  keys.push('L', 'B', 'Hb', 'hs', 'ex')
+  if (p.fd === 'tanah') keys.push('G', 'nu')
+  else keys.push('hc', 'bc', 'z')
   if (p.sk > 0) keys.push('sk')
   const sp = new URLSearchParams({ setup, fd: p.fd })
   for (const k of keys) sp.set(k, String(p[k]))

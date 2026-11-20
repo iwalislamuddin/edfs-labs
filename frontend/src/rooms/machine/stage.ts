@@ -1,5 +1,5 @@
 // Panggung Room Machine Foundation: mesin (rotasi / torak) di atas blok tanah (geser + vertikal + rocking) atau
-// meja beton (vertikal), orbit titik bantalan, dan takometer dengan pita resonansi.
+// meja beton di atas kolom jepit–jepit (sway + vertikal + rocking), orbit titik bantalan, dan takometer dengan pita resonansi.
 import { dashpot, hatchH, spring } from '../../lab/draw'
 import { C, FONT, FONT_B } from '../../lab/theme'
 import type { FndKind, Setup } from './model'
@@ -31,7 +31,9 @@ export interface StageInput {
   fRel: [number, number]
   r: number // m
   l: number // m
-  /** Geometri blok (m) — pondasi tanah. */
+  /** Geometri blok / pelat (m); kolom meja hc, bc. */
+  hc: number
+  bc: number
   L: number
   Hb: number
   hs: number
@@ -144,31 +146,74 @@ export function drawStage(ctx: Ctx, w: number, h: number, o: StageInput) {
     // posisi bantalan di gambar (rest) untuk orbit
     bearingPx = [mx, cy]
   } else {
-    const gy = h - 30
-    const bw = Math.min(230, w * (narrow ? 0.5 : 0.34))
-    hatchH(ctx, cx - bw / 2 - 40, cx + bw / 2 + 40, gy, 1)
-    const dy = -o.z * s
-    const deckY = gy - Math.min(170, h * 0.42) + dy
-    const dh = 22
-    ctx.fillStyle = '#c9c6bd'
-    ctx.strokeStyle = C.ink
-    ctx.lineWidth = 1.2
+    // meja: pelat kaku di atas kolom jepit–jepit; kolom digambar sebagai kurva Hermite (u, u' di ujung atas)
+    const gy = h - 52
+    const bwMax = Math.min(240, w * (narrow ? 0.5 : 0.34))
+    const gs = Math.min(bwMax / o.L, (gy - 70) / (o.hc + o.Hb + o.hs + 0.6))
+    const bw = o.L * gs
+    const bh = o.Hb * gs
+    const hcPx = o.hc * gs
+    const soffit = gy - hcPx
+    ctx.fillStyle = '#d9d6cc'
+    ctx.fillRect(cx - bw / 2 - 30, gy, bw + 60, 10)
+    hatchH(ctx, cx - bw / 2 - 40, cx + bw / 2 + 40, gy + 10, 1)
+    const aM = Math.max(0.1, o.L / 2 - o.bc / 2)
+    const bcPx = Math.max(6, o.bc * gs)
+    const U = (o.x + o.zc * o.psi) * s
+    const slope = (-o.psi * s) / gs
     for (const sd of [-1, 1]) {
-      const x = cx + sd * (bw / 2 - 18)
-      ctx.fillRect(x - 10, deckY + dh, 20, gy - deckY - dh)
-      ctx.strokeRect(x - 10, deckY + dh, 20, gy - deckY - dh)
+      const xa = cx + sd * aM * gs
+      const wTop = (o.z + sd * aM * o.psi) * s
+      const pts: [number, number][] = []
+      for (let i = 0; i <= 24; i++) {
+        const xi = i / 24
+        pts.push([xa + U * (3 * xi * xi - 2 * xi ** 3) + slope * hcPx * (xi ** 3 - xi * xi), gy - xi * (hcPx + wTop)])
+      }
+      for (const [lw, col] of [
+        [bcPx + 2.4, C.ink],
+        [bcPx, '#c9c6bd'],
+      ] as const) {
+        ctx.strokeStyle = col
+        ctx.lineWidth = lw
+        ctx.lineCap = 'butt'
+        ctx.beginPath()
+        pts.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)))
+        ctx.stroke()
+      }
     }
-    ctx.fillStyle = '#b9b6ad'
-    ctx.fillRect(cx - bw / 2 - 10, deckY, bw + 20, dh)
-    ctx.strokeRect(cx - bw / 2 - 10, deckY, bw + 20, dh)
     ctx.fillStyle = C.mute
     ctx.font = FONT
-    ctx.textAlign = 'center'
+    ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    ctx.fillText('meja beton (table-top) — hanya mode vertikal', cx, gy - 40)
-    const cy = deckY - 43
-    drawMachine(ctx, o, cx, deckY, cy)
-    bearingPx = [cx, cy - dy]
+    ctx.fillText('kolom jepit–jepit', cx + bw / 2 + 14, gy - hcPx / 2)
+    // pelat kaku + mesin: translasi CG + rotasi ψ (sudut gambar = ψ·s/gs)
+    const cgX = cx
+    const cgY = soffit - o.zc * gs
+    ctx.save()
+    ctx.translate(cgX + o.x * s, cgY - o.z * s)
+    ctx.rotate((-o.psi * s) / gs)
+    ctx.translate(-cgX, -cgY)
+    ctx.fillStyle = '#b9b6ad'
+    ctx.strokeStyle = C.ink
+    ctx.lineWidth = 1.5
+    ctx.fillRect(cx - bw / 2, soffit - bh, bw, bh)
+    ctx.strokeRect(cx - bw / 2, soffit - bh, bw, bh)
+    ctx.fillStyle = C.ink
+    ctx.font = FONT
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    if (bh > 18) ctx.fillText('pelat meja', cx - bw / 2 + 8, soffit - bh / 2)
+    const mx = cx + o.ex * gs
+    const top = soffit - bh
+    const cy = top - Math.max(30, o.hs * gs)
+    drawMachine(ctx, o, mx, top, cy)
+    ctx.fillStyle = C.navy
+    ctx.beginPath()
+    ctx.arc(cgX, cgY, 4, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillText('CG', cgX + 7, cgY)
+    ctx.restore()
+    bearingPx = [mx, cy]
   }
 
   // orbit bantalan (simpangan diperbesar)
@@ -200,7 +245,7 @@ export function drawStage(ctx: Ctx, w: number, h: number, o: StageInput) {
   const fx0 = cx + Math.min(230, w * 0.34) / 2 + 36
   const fy0 = Math.round(h * 0.18) + 40
   arrowF(ctx, fx0, fy0, 0, -o.fRel[1] * 50)
-  if (o.fd === 'tanah') arrowF(ctx, fx0, fy0, o.fRel[0] * 50, 0)
+  arrowF(ctx, fx0, fy0, o.fRel[0] * 50, 0)
   ctx.fillStyle = C.red
   ctx.font = FONT_B
   ctx.textAlign = 'left'

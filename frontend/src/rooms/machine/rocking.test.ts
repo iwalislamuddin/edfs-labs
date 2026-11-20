@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Machine } from './physics'
 import { lysmer, steadyAmp } from './physics'
-import { bearing, blockSystem, modes3, step3, steady3, type State3 } from './rocking'
+import { bearing, blockSystem, modes3, step3, steady3, steadyState3, tableK, tableSystem, type State3 } from './rocking'
 
 const soil = { G: 4e7, nu: 0.35, rho: 1800 }
 const blk = { L: 5, B: 4, H: 1.25 }
@@ -73,5 +73,85 @@ describe('Rocking — sistem 3DOF', () => {
     const st = steady3(s, rec, 60)
     expect(Math.abs(hx / st.hx - 1)).toBeLessThan(0.02)
     expect(Math.abs(hz / st.hz - 1)).toBeLessThan(0.02)
+  })
+})
+
+describe('Pondasi meja — pelat kaku di atas kolom jepit–jepit', () => {
+  const col = { hc: 4, bc: 0.6, E: 3e10 }
+  const pl = { Mm: 1e4, hs: 1, ex: 0.4 }
+
+  /** Geser bawah pelat U = x + zc·ψ akibat gaya F horizontal tepat di bawah pelat (dz = −zc). */
+  function sway(kx: number, kz: number) {
+    const zc = 0.9
+    const K = tableK(kx, kz, 2, zc, 4)
+    const F = 1000
+    // sistem [x, ψ] (z terpisah); gaya umum ψ = −dz·F = zc·F
+    const [a, b, d] = [K[0][0], K[0][2], K[2][2]]
+    const det = a * d - b * b
+    const x = (d * F - b * zc * F) / det
+    const psi = (a * zc * F - b * F) / det
+    return { U: x + zc * psi, F }
+  }
+
+  it('tanpa kekakuan aksial: kolom berperilaku kantilever bersama, U = F·h³/(3ΣEI) = 4F/kx', () => {
+    const kx = 2.4e8
+    const { U, F } = sway(kx, 0)
+    expect((U * kx) / F).toBeCloseTo(4, 6)
+  })
+
+  it('gaya di CG (e = zc di atas kolom), tanpa kekakuan aksial: U = F·h³/3EI + F·e·h²/2EI (arah rotasi benar)', () => {
+    const kx = 2.4e8
+    const zc = 0.9
+    const h = 4
+    const K = tableK(kx, 0, 2, zc, h)
+    const F = 1000
+    const [a, b, d] = [K[0][0], K[0][2], K[2][2]]
+    const det = a * d - b * b
+    const x = (d * F) / det
+    const psi = (-b * F) / det
+    const U = x + zc * psi
+    expect((U * kx) / F).toBeCloseTo(4 + (6 * zc) / h, 6)
+  })
+
+  it('kolom aksial sangat kaku: pelat tidak berotasi, U = F/Σ(12EI/h³)', () => {
+    const kx = 2.4e8
+    const { U, F } = sway(kx, 1e16)
+    expect((U * kx) / F).toBeCloseTo(1, 5)
+  })
+
+  it('mode vertikal = √(ΣEA/h / M), redaman modal ζ sama di semua mode', () => {
+    const s = tableSystem(blk, pl, col, 0.03)
+    expect(s.kz).toBeCloseTo((4 * col.E * col.bc ** 2) / col.hc, 0)
+    expect(s.kx).toBeCloseTo((4 * col.E * col.bc ** 4) / col.hc ** 3, 0)
+    const md = modes3(s)
+    const v = md.find((m) => m.kind === 'vertikal')!
+    expect(v.w).toBeCloseTo(Math.sqrt(s.kz / s.M), 6)
+    for (const m of md) expect(m.zeta).toBeCloseTo(0.03, 8)
+    // mode sway pertama jauh di bawah vertikal (kolom langsing secara lentur)
+    expect(md[0].kind).toBe('geser–rocking 1')
+    expect(md[0].w).toBeLessThan(v.w / 3)
+  })
+
+  it('simulasi waktu dari keadaan tunak tetap tunak (rotasi & torak)', () => {
+    for (const [m, w] of [
+      [rot, 150],
+      [rec, 70],
+    ] as const) {
+      const s = tableSystem(blk, pl, col, 0.03)
+      const st0 = steadyState3(s, m, w, 0)
+      let x: State3 = { q: st0.q, v: st0.v, th: 0, w }
+      const h = 1 / 40000
+      let hx = 0
+      let hz = 0
+      for (let t = 0; t < 0.4; t += h) {
+        x = step3(s, m, x, 0, h)
+        const [bx, bz] = bearing(s, x.q)
+        hx = Math.max(hx, Math.abs(bx))
+        hz = Math.max(hz, Math.abs(bz))
+      }
+      const st = steady3(s, m, w)
+      expect(Math.abs(hx / st.hx - 1)).toBeLessThan(0.005)
+      expect(Math.abs(hz / st.hz - 1)).toBeLessThan(0.005)
+    }
   })
 })

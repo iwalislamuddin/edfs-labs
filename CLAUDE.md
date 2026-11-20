@@ -65,7 +65,8 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   m·e·ω² / torak primer+sekunder, analog Lysmer kz/cz, amplitudo tunak 2 harmonik, RK4 dengan θ, ω, α) diuji di
   `physics.test.ts`; `rocking.ts` blok kaku 3DOF di CG (geser x, vertikal z, rocking ψ; kx/kz Lysmer, kψ/cψ Hall,
   kopel lewat tinggi CG zc; gaya horizontal dari massa berputar di ketinggian poros, offset ex; respons tunak kompleks
-  `steady3`/`steadyState3`, `modes3`, RK4 `step3`; pondasi meja = `verticalSystem` dengan x, ψ dikunci) diuji di
+  `steady3`/`steadyState3`, `modes3`, RK4 `step3`; pondasi meja = `tableSystem`: pelat kaku di atas 4 kolom jepit–jepit, `tableK`
+  kx = Σ12EI/h³, kz = ΣEA/h, kopel sway–rocking lewat lentur kolom, `modalDamping` ζ sama semua mode) diuji di
   `rocking.test.ts`. Setup Mesin Rotasi / Mesin Torak × pondasi blok tanah (L, B, H, tinggi poros, offset) / meja;
   amplitudo dinilai di bantalan (x − dz·ψ, z + dx·ψ), orbit bantalan, start/stop dengan laju rpm/s, jejak run-up
   per arah, takometer & grafik dengan pita ±20% tiap mode, kategori kecepatan indikatif. Skala gambar simpangan
@@ -94,8 +95,9 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
 - Live: **Room Earthquake**: gempa sintetis (bukan rekaman nyata), spektrum titik demi titik vs SNI 1726, isolasi dasar.
   Lanjutan: impor rekaman nyata (CSV/AT2), spektrum MDOF (gabung Shear Building, SRSS/CQC), TMD, histeretik/daktilitas.
 - Live: **Room Machine Foundation**: mesin rotasi & torak, blok tanah (redaman radiasi) vs meja beton, run-up/coast-down.
-  Rocking + geser terkopel sudah ada (blok tanah). Lanjutan: penanaman blok (embedment), konstanta tanah bergantung
-  frekuensi, sway/rotasi meja table-top, torsi (yawing), multi-silinder, isolator pegas.
+  Rocking + geser terkopel (blok tanah) dan sway + rocking meja (kolom jepit–jepit) sudah ada. Lanjutan: penanaman blok
+  (embedment), konstanta tanah bergantung frekuensi, massa/lentur kolom & balok meja, torsi (yawing), multi-silinder,
+  isolator pegas.
 - Belum: Room lain (Fase 2 Material, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
