@@ -68,7 +68,8 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   `steady3`/`steadyState3`, `modes3`, RK4 `step3`; pondasi meja = `verticalSystem` dengan x, ψ dikunci) diuji di
   `rocking.test.ts`. Setup Mesin Rotasi / Mesin Torak × pondasi blok tanah (L, B, H, tinggi poros, offset) / meja;
   amplitudo dinilai di bantalan (x − dz·ψ, z + dx·ψ), orbit bantalan, start/stop dengan laju rpm/s, jejak run-up
-  per arah, takometer & grafik dengan pita ±20% tiap mode, kategori kecepatan indikatif.
+  per arah, takometer & grafik dengan pita ±20% tiap mode, kategori kecepatan indikatif. Skala gambar simpangan
+  auto atau tetap (`sk` = px per µm di URL, batang skala + peringatan keluar skala) untuk membandingkan antar parameter.
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru

@@ -25,6 +25,7 @@ export interface Params {
   nu: number
   k: number // kekakuan meja (MN/m)
   z: number // redaman meja
+  sk: number // skala tampilan simpangan (px per µm); 0 = auto
 }
 
 export const SETUPS: { id: Setup; label: string; hint: string }[] = [
@@ -62,6 +63,7 @@ export const RANGES: Record<Exclude<keyof Params, 'fd'>, Range> = {
   nu: { min: 0.25, max: 0.45, step: 0.01 },
   k: { min: 10, max: 3000, step: 10 },
   z: { min: 0.01, max: 0.1, step: 0.005 },
+  sk: { min: 0, max: 20, step: 0.01 },
 }
 
 export const RPM_MAX: Record<Setup, number> = { rotasi: 3600, torak: 1200 }
@@ -87,8 +89,15 @@ export function defaults(s: Setup): Params {
     nu: 0.35,
     k: 400,
     z: 0.02,
+    sk: 0,
   }
 }
+
+/** Pilihan skala tetap (px per µm simpangan). */
+export const SCALES = [0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20]
+
+/** Skala pilihan terdekat di bawah (atau sama dengan) skala auto saat ini. */
+export const snapScale = (pxPerUm: number) => [...SCALES].reverse().find((v) => v <= pxPerUm * 1.0001) ?? SCALES[0]
 
 export const RHO = 1800 // kg/m³ tanah
 
@@ -147,6 +156,7 @@ export function toQuery(setup: Setup, p: Params): string {
   else keys.push('mRec', 'mRot', 'r', 'lr')
   if (p.fd === 'tanah') keys.push('L', 'B', 'Hb', 'hs', 'ex', 'G', 'nu')
   else keys.push('Mb', 'k', 'z')
+  if (p.sk > 0) keys.push('sk')
   const sp = new URLSearchParams({ setup, fd: p.fd })
   for (const k of keys) sp.set(k, String(p[k]))
   return sp.toString()

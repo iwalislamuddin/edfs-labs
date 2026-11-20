@@ -3,7 +3,7 @@ import { fitCanvas } from '../../lab/draw'
 import { drawPlot, PlotScale, type Sample } from '../../lab/plot'
 import { C } from '../../lab/theme'
 import { Segmented, Slider } from '../../ui/controls'
-import { defaults, FNDS, foundationOf, machineOf, parseQuery, RANGES, RPM_MAX, SETUPS, severity, toQuery, type FndKind, type Params, type Setup } from './model'
+import { defaults, FNDS, foundationOf, machineOf, parseQuery, RANGES, RPM_MAX, SCALES, SETUPS, severity, snapScale, toQuery, type FndKind, type Params, type Setup } from './model'
 import { forceHarmonics, rpmToW, wToRpm } from './physics'
 import { drawResponse, rpmAt, type RespLayout } from './response'
 import { bearing, machineForces, modes3, step3, steady3, steadyState3, type Mode3, type State3 } from './rocking'
@@ -112,7 +112,7 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
 
   const changeSetup = (s: Setup) => {
     setSetup(s)
-    setP({ ...defaults(s), fd: p.fd })
+    setP({ ...defaults(s), fd: p.fd, sk: p.sk })
     setMotorOn(false)
     sim.current = { q: [0, 0, 0], v: [0, 0, 0], th: 0, w: 0, t: 0 }
     clearTrace()
@@ -225,7 +225,8 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
         const { w: cw, h: ch, ctx } = fitCanvas(sc)
         const amp = Math.max(stNow.hx, stNow.hz, stTgt.hx, stTgt.hz, Math.abs(bx), Math.abs(bz), 1e-7)
         const tg = targetScale(amp)
-        view.current = view.current === 0 || tg < view.current ? tg : view.current + (tg - view.current) * 0.02
+        if (L.p.sk > 0) view.current = L.p.sk * 1e6
+        else view.current = view.current === 0 || tg < view.current ? tg : view.current + (tg - view.current) * 0.02
         const [Fx, Fz] = machineForces(L.mach, s.th, s.w, 0)
         drawStage(ctx, cw, ch, {
           setup: L.setup,
@@ -248,6 +249,9 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
           ex: L.p.ex,
           zc: L.sys.zc,
           scale: view.current,
+          fixed: L.p.sk > 0,
+          // simpangan terbesar yang digambar: bantalan, atau sudut blok akibat rocking
+          ampMax: Math.max(stNow.hx, stNow.hz, Math.abs(bx), Math.abs(bz), stNow.psi * Math.max(L.p.L / 2, L.p.Hb + L.p.hs)),
           orbit: orbit.current,
           level: Math.min(1, stNow.v / 0.01),
         })
@@ -355,6 +359,25 @@ export default function MachineRoom({ query, onQuery }: { query: string; onQuery
         <section className="stage-col">
           <div className="card stage-card">
             <canvas ref={stageRef} className="stage" style={{ height: 400 }} />
+            <div className="stage-scale">
+              <Segmented
+                value={p.sk > 0 ? 'tetap' : 'auto'}
+                options={[
+                  { id: 'auto', label: 'Skala auto', title: 'Skala gambar mengikuti amplitudo saat ini' },
+                  { id: 'tetap', label: 'Tetap', title: 'Kunci skala agar simpangan bisa dibandingkan langsung saat parameter diubah' },
+                ]}
+                onChange={(m) => setP((old) => ({ ...old, sk: m === 'auto' ? 0 : snapScale(view.current / 1e6) }))}
+              />
+              {p.sk > 0 && (
+                <select className="speed" value={p.sk} onChange={(e) => setP((old) => ({ ...old, sk: Number(e.target.value) }))} aria-label="Skala simpangan">
+                  {SCALES.map((v) => (
+                    <option key={v} value={v}>
+                      1 µm = {String(v).replace('.', ',')} px
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className="stage-tip wide-only">Gerak lambat {speed}× — putaran & getaran digambar pada waktu simulasi.</div>
           </div>
           <div className="card plot-card">

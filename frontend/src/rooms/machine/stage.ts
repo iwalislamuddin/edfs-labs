@@ -38,6 +38,10 @@ export interface StageInput {
   ex: number
   zc: number
   scale: number // px per m untuk simpangan
+  /** Skala auto (mengikuti amplitudo) atau tetap (pilihan pengguna, untuk membandingkan antar parameter). */
+  fixed: boolean
+  /** Amplitudo terbesar yang sedang digambar (m), untuk peringatan keluar skala. */
+  ampMax: number
   /** Orbit bantalan satu putaran terakhir: pasangan (horizontal, vertikal) dalam m. */
   orbit: [number, number][]
   level: number
@@ -207,7 +211,13 @@ export function drawStage(ctx: Ctx, w: number, h: number, o: StageInput) {
   ctx.font = FONT
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText(`simpangan & rotasi diperbesar ×${fmtBig(o.scale / 1000)}`, 12, 10)
+  ctx.fillText(`simpangan & rotasi: skala ${o.fixed ? 'tetap' : 'auto'} — 1 µm = ${fmtPx(o.scale / 1e6)} px`, 12, 10)
+  drawScaleBar(ctx, 12, 30, o.scale)
+  if (o.fixed && o.ampMax * o.scale > 40) {
+    ctx.fillStyle = C.orange
+    ctx.font = FONT_B
+    ctx.fillText('simpangan melebihi skala tampilan — perkecil skala', 12, 44)
+  }
 
   drawTacho(ctx, narrow ? w - 64 : w * 0.82, narrow ? 76 : h * 0.34, narrow ? 50 : Math.min(80, w * 0.1), o)
 }
@@ -324,7 +334,31 @@ function drawMachine(ctx: Ctx, o: StageInput, mx: number, top: number, cy: numbe
   ctx.stroke()
 }
 
-const fmtBig = (v: number) => (v >= 1e4 ? `${Math.round(v / 1000)} rb` : v >= 10 ? Math.round(v).toString() : v.toFixed(1))
+const fmtPx = (v: number) => (v >= 10 ? Math.round(v).toString() : v >= 1 ? v.toFixed(1).replace('.', ',') : v.toPrecision(2).replace('.', ','))
+
+/** Batang skala: panjang 'bulat' (1-2-5 µm) sekitar 40–100 px. */
+function drawScaleBar(ctx: Ctx, x: number, y: number, scale: number) {
+  const pxPerUm = scale / 1e6
+  const raw = 60 / pxPerUm
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
+  const n = raw / mag
+  const um = (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * mag
+  const len = um * pxPerUm
+  ctx.strokeStyle = C.ink
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(x, y - 4)
+  ctx.lineTo(x, y)
+  ctx.lineTo(x + len, y)
+  ctx.lineTo(x + len, y - 4)
+  ctx.stroke()
+  ctx.fillStyle = C.ink
+  ctx.font = FONT
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  const lab = um >= 1000 ? `${um / 1000} mm` : um >= 1 ? `${um} µm` : `${um.toPrecision(1)} µm`
+  ctx.fillText(lab.replace('.', ','), x + len + 6, y - 1)
+}
 
 /** Takometer: busur 240° untuk 0..rpmMax, pita resonansi ±20% tiap mode. */
 function drawTacho(ctx: Ctx, cx: number, cy: number, R: number, o: StageInput) {
