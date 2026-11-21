@@ -87,6 +87,15 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   elastica (integral eliptik K/E + RK4 θ'' = −λ² sin θ; hanya tumpuan seperempat-gelombang: sendi, jepit–bebas, jepit)
   diuji di `buckling.test.ts`. `model.ts` memakai ulang penampang Room Section (`column()`: I/r/c/S terhadap sumbu x, y, atau
   sumbu utama terlemah). Tab Euler / Imperfeksi (uji tekan otomatis sampai leleh pertama, plot Southwell) / Kurva Kolom / Elastica.
+  Room Tensile Test (`rooms/tensile-test/`, slug `tensile-test`): `material.ts` baja (plateau: elastis → ReH → ReL + pita
+  Lüders → pengerasan σ = fu + (fy − fu)((εu − ε)/(εu − εsh))^p; atau Ramberg–Osgood lewat (Rp0,2, fy) dan (εu, fu)), necking
+  Hollomon σt = K·εt^n dengan n = ln(1+εu) (Considère) + bagian seragam membongkar elastis; panjang zona leher λ·d0 dikalibrasi
+  dari A5 (L0 = 5d0) sehingga A bergantung L0 (Barba); `respond()` bongkar–muat sejajar E; `analyze()` mengolah data sel beban
+  (hanya selubung pembebanan pertama) seperti ISO 6892-1: E regresi 10–45% Rm, ReH/ReL, Rp0,2 offset, Ag, A, U. 7 preset
+  (BJ37/41/50, BjTS 420B, mutu tinggi, aluminium, besi cor). Beton: Popovics–Thorenfeldt–Collins, Hognestad, modulus chord
+  ASTM C469, uji belah fct = 2P/(πLD) + σx/σy elastis di diameter. Diuji di `material.test.ts`. Tab Uji Tarik / Bongkar-Muat
+  (siklus otomatis) / Bandingkan (deret benda uji patah, batang ketangguhan) / Beton (tekan silinder, tarik belah).
+  Grafik garis umum (`chart()`, `fmt`) dipindah ke `lab/chart.ts` (dipakai Buckling dan Tensile Test).
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -121,7 +130,11 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   bayangan cermin jepit–bebas, Southwell, Perry–Robertson, SNI 1729 E3 (K teori/rekomendasi), elastica pasca-tekuk.
   Lanjutan: pengaku lateral di tengah (mode 2 dipaksa), tekuk inelastis numerik (tegangan sisa), tekuk torsi/lentur-torsi
   (siku, kanal), tekuk lokal pelat (Q), portal bergoyang (alinyemen G), beam-column (interaksi H1).
-- Belum: Room lain (Fase 2 Material: Tensile Test; Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
+- Live: **Room Tensile Test** (tab Uji Tarik / Bongkar-Muat / Bandingkan / Beton): mesin uji dengan benda uji bulat (bahu,
+  pita Lüders, leher, patahan mangkuk–kerucut/getas), seret crosshead, data dengan derau, tabel model vs terukur, kurva
+  sebenarnya, syarat BjTS 420B (Rm/Re ≥ 1,25). Lanjutan: penuaan regangan & Bauschinger (siklus tarik–tekan), laju regangan,
+  suhu/Charpy, pelat (benda uji pipih), tulangan dengan sirip, kurva desain baja tulangan bilinear/Park untuk Room beton.
+- Belum: Room lain (Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
 - Repo GitHub berstatus publik, sementara README menyebut proprietary.

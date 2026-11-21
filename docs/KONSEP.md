@@ -68,7 +68,7 @@ Dasar dinamika struktur dan gempa.
 | Room | Isi | Prioritas |
 |---|---|---|
 | **Element** | Elemen 2D (dan sajian 3D sederhana) dengan σx, σy, τxy: rotasi elemen, tegangan utama, lingkaran Mohr interaktif, regangan & Poisson | MVP |
-| Tensile Test | Uji tarik baja/beton: kurva tegangan–regangan, leleh, strain hardening, necking, modulus | Fase 2 |
+| Tensile Test | Uji tarik baja (leleh atas/bawah, pita Lüders, pengerasan, necking Considère, panjang ukur, bongkar–muat, 7 material) + beton tekan silinder & tarik belah | **live** |
 | Buckling | Kolom Euler dengan berbagai tumpuan, panjang efektif, imperfeksi & Southwell, kurva kolom SNI 1729, elastica | **live** |
 | Section | Penampang (persegi, kotak, WF, T, kanal, siku, Z, pipa): titik berat, momen inersia, Steiner, sumbu utama, tegangan lentur dua arah, garis netral, inti, geser VQ/Ib | **live** |
 
