@@ -80,6 +80,13 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   `stage.ts` tab Properti (sumbu u yang diputar, sumbu utama, elips inersia, GN plastis) / Tegangan Normal (gradien σ,
   garis netral, inti, titik tangkap N bisa digeser) / Tegangan Geser (potongan digeser, luas Q diarsir, diagram τ(y));
   `charts.ts` I(θ), σ tegak lurus garis netral, b/Q/τ terhadap y.
+  Room Buckling (`rooms/buckling/`, slug `buckling`): `buckling.ts` Euler analitis 4 tumpuan (akar βL karakteristik, mode
+  1–3, bentuk mode + titik belok), elemen hingga balok-kolom (K + kekakuan geometrik G, eigen via Cholesky + `jacobiEigen`),
+  kolom tak sempurna (lengkung awal e0 = bentuk mode 1, eksentrisitas e sebagai momen ujung di ujung bebas berputar;
+  M = −EI·w''), rumus δ = e0·α/(1−α) + e(sec(kLe/2) − 1), `southwell`, `firstYield`, `sniFcr` (SNI 1729 E3), `perry`,
+  elastica (integral eliptik K/E + RK4 θ'' = −λ² sin θ; hanya tumpuan seperempat-gelombang: sendi, jepit–bebas, jepit)
+  diuji di `buckling.test.ts`. `model.ts` memakai ulang penampang Room Section (`column()`: I/r/c/S terhadap sumbu x, y, atau
+  sumbu utama terlemah). Tab Euler / Imperfeksi (uji tekan otomatis sampai leleh pertama, plot Southwell) / Kurva Kolom / Elastica.
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -110,7 +117,11 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
 - Live: **Room Section** (tab Properti / Tegangan Normal / Tegangan Geser): tabel Steiner, rumus vs grid, Iu(θ), Z & faktor
   bentuk, inti penampang, keseimbangan ∫σ dA, τ di loncatan sayap–badan. Lanjutan: penampang bebas (tambah/geser persegi),
   pusat geser & aliran geser di sayap tipis, torsi, penampang beton bertulang (retak/transformasi), penampang komposit.
-- Belum: Room lain (Fase 2 Material: Tensile Test, Buckling; Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
+- Live: **Room Buckling** (tab Euler / Imperfeksi / Kurva Kolom / Elastica): Pcr teori vs eigen matriks, panjang efektif &
+  bayangan cermin jepit–bebas, Southwell, Perry–Robertson, SNI 1729 E3 (K teori/rekomendasi), elastica pasca-tekuk.
+  Lanjutan: pengaku lateral di tengah (mode 2 dipaksa), tekuk inelastis numerik (tegangan sisa), tekuk torsi/lentur-torsi
+  (siku, kanal), tekuk lokal pelat (Q), portal bergoyang (alinyemen G), beam-column (interaksi H1).
+- Belum: Room lain (Fase 2 Material: Tensile Test; Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
 - Repo GitHub berstatus publik, sementara README menyebut proprietary.

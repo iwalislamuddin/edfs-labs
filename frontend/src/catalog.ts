@@ -50,7 +50,7 @@ export const zones: Zone[] = [
     rooms: [
       { slug: 'element', name: 'Element', desc: 'Tegangan-regangan 2D/3D, tegangan utama, lingkaran Mohr.', state: 'live' },
       { slug: 'tensile-test', name: 'Tensile Test', desc: 'Uji tarik virtual: leleh, strain hardening, necking.', state: 'soon' },
-      { slug: 'buckling', name: 'Buckling', desc: 'Tekuk kolom Euler, panjang efektif, imperfeksi.', state: 'soon' },
+      { slug: 'buckling', name: 'Buckling', desc: 'Tekuk kolom Euler 4 tumpuan, mode tinggi, imperfeksi & Southwell, kurva kolom SNI 1729, elastica.', state: 'live' },
       { slug: 'section', name: 'Section', desc: 'Titik berat, momen inersia, Steiner, sumbu utama, tegangan lentur dua arah, inti, geser VQ/Ib.', state: 'live' },
     ],
   },
