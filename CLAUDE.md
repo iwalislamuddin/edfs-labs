@@ -105,6 +105,14 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   simpul; ΣFy bila batang lain horizontal, selain itu ΣM terhadap O), `ilCurve`/`ilStats` (luas ±), `truckExtremes` (gandar di
   titik patah + sapuan, dua arah). Diuji di `influence.test.ts` (semua batang rangka teori = matriks, Müller–Breslau via Maxwell,
   superposisi truk). `stage.ts` struktur + beban (atas) dan garis pengaruh sejajar (bawah), titik terukur per Lt/60, Müller–Breslau.
+  Room Hydrostatic (`rooms/hydrostatic/`, slug `hydrostatic`, Zone Fluida): `hydro.ts` tekanan berlapis `pressure()` vs
+  `columnIntegral` (terukur), bejana paradoks (`vesselWidth`/`vesselWeight`); pintu bidang `gateMoments` (∫b·s^k ds bentuk
+  tertutup persegi/lingkaran/segitiga, s dari tepi atas sepanjang kemiringan), `planeForce` (γ·hc·A, yp = yc + Ic/(yc·A) dari
+  luas basah) vs `planeStrips`, `gateSolve` (air hulu/hilir, berat, engsel atas/bawah/poros + stop di tepi bawah; P < 0 di poros
+  = membuka), `openingLevel`; permukaan lengkung busur `Arc` (dilalui bawah→atas, air di kiri, gaya ke kanan arah jalan)
+  `curvedForce` (FH proyeksi, FV = γ·badan tekanan bertanda, xFV) vs `curvedStrips` (Σp·n·ds, momen thd pusat & ambang);
+  diuji di `hydro.test.ts`. `model.ts` setup + `arcOf` (radial/kuadran cekung/cembung/menggantung). `stage.ts` bejana +
+  piezometer + diagram p, pintu miring + prisma tekanan + tampak depan, busur + badan tekanan (khayal) + proyeksi tegak.
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -147,7 +155,11 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   GP teori vs titik terukur, Müller–Breslau, potongan Ritter + titik O digambar, truk T (posisi kritis, grafik efek vs X),
   beban lajur q·A + p·η (pola BTR+BGT). Lanjutan: balok Gerber (sendi dalam), lantai di batang atas, GP lendutan,
   selubung momen akibat truk, kereta beban/BM, rangka tepi tak sejajar (Parker/K).
-- Belum: Room lain (Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
+- Live: **Room Hydrostatic** (tab Tekanan / Pintu Bidang / Permukaan Lengkung): fluida berlapis + p₀ (tangki tertutup/vakum),
+  piezometer, paradoks hidrostatis, pintu persegi/lingkaran/segitiga miring dengan air hilir & berat, pintu poros otomatis
+  (muka air buka), pintu radial (momen thd poros = 0), badan tekanan khayal. Lanjutan: manometer U / diferensial, pintu
+  berengsel dengan pemberat (counterweight), gaya pada dinding bejana (paradoks lengkap), tekanan pada bendung/dam gravitasi.
+- Belum: Room lain (Fluida selain Hydrostatic, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
 - Repo GitHub berstatus publik, sementara README menyebut proprietary.

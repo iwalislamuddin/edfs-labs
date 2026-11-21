@@ -60,7 +60,7 @@ export const zones: Zone[] = [
     tagline: 'Hidrostatika dan hidrolika',
     color: '#1f6f8b',
     rooms: [
-      { slug: 'hydrostatic', name: 'Hydrostatic', desc: 'Tekanan hidrostatis, gaya pada pintu air.', state: 'soon' },
+      { slug: 'hydrostatic', name: 'Hydrostatic', desc: 'Tekanan fluida berlapis & piezometer, gaya dan pusat tekanan pada pintu air, permukaan lengkung & pintu radial.', state: 'live' },
       { slug: 'buoyancy', name: 'Buoyancy', desc: 'Archimedes dan stabilitas benda apung.', state: 'soon' },
       { slug: 'pipe-flow', name: 'Pipe Flow', desc: 'Bernoulli, garis energi, kehilangan tinggi tekan.', state: 'soon' },
       { slug: 'open-channel', name: 'Open Channel', desc: 'Manning, energi spesifik, loncatan hidrolis.', state: 'soon' },

@@ -75,7 +75,7 @@ Dasar dinamika struktur dan gempa.
 ### Zone 4 — Fluida *(Hidrolika)*
 | Room | Isi | Prioritas |
 |---|---|---|
-| Hydrostatic | Tekanan vs kedalaman, gaya & titik tangkap pada pintu air (tegak/miring) | Fase 2 |
+| Hydrostatic | Tekanan vs kedalaman (berlapis, piezometer, paradoks), gaya & titik tangkap pada pintu air (tegak/miring, poros otomatis), permukaan lengkung & pintu radial | **live** |
 | Buoyancy | Archimedes, stabilitas benda apung (metasentrum) | Fase 2 |
 | Pipe Flow | Bernoulli, garis energi & hidrolis, kehilangan tinggi tekan | Fase 3 |
 | Open Channel | Manning, energi spesifik, aliran kritis, loncatan hidrolis | Fase 3 |

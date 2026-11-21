@@ -16,6 +16,7 @@ const ROOMS: Record<string, React.LazyExoticComponent<React.ComponentType<{ quer
   earthquake: lazy(() => import('./rooms/earthquake/EarthquakeRoom')),
   machine: lazy(() => import('./rooms/machine/MachineRoom')),
   resonance: lazy(() => import('./rooms/resonance/ResonanceRoom')),
+  hydrostatic: lazy(() => import('./rooms/hydrostatic/HydrostaticRoom')),
 }
 
 /** Rute hash: #/<room>?<query>. (Saat deploy: pindah ke path /<room> dengan fallback SPA.) */
