@@ -8,6 +8,7 @@ const ROOMS: Record<string, React.LazyExoticComponent<React.ComponentType<{ quer
   pendulum: lazy(() => import('./rooms/pendulum/PendulumRoom')),
   structure: lazy(() => import('./rooms/structure/StructureRoom')),
   element: lazy(() => import('./rooms/element/ElementRoom')),
+  section: lazy(() => import('./rooms/section/SectionRoom')),
   'shear-building': lazy(() => import('./rooms/shear-building/ShearBuildingRoom')),
   earthquake: lazy(() => import('./rooms/earthquake/EarthquakeRoom')),
   machine: lazy(() => import('./rooms/machine/MachineRoom')),

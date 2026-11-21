@@ -71,6 +71,15 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   amplitudo dinilai di bantalan (x − dz·ψ, z + dx·ψ), orbit bantalan, start/stop dengan laju rpm/s, jejak run-up
   per arah, takometer & grafik dengan pita ±20% tiap mode, kategori kecepatan indikatif. Skala gambar simpangan
   auto atau tetap (`sk` = px per µm di URL, batang skala + peringatan keluar skala) untuk membandingkan antar parameter.
+  Room Section (`rooms/section/`, slug `section`): `section.ts` penampang dari bagian persegi/lingkaran (lubang = tanda −1,
+  bagian positif tidak tumpang tindih) — A, titik berat, Ix/Iy/Ixy (Steiner), sumbu utama, `rotated()` Iu/Iv/Iuv, `gridScan`
+  (pembanding kertas milimeter), `above()` luas & momen pertama di atas garis (eksak, termasuk segmen lingkaran),
+  `plastic()` Zx/Zy, `tauAt`/`shearProfile` τ = V(Iy·Qx − Ixy·Qy)/((IxIy − Ixy²)b), `stressPlane` σ = N/A + a·x + b·y
+  (lentur dua arah tak simetris; Mx + menekan atas, My + menekan kanan), `hull` + `kern` (inti), diuji di `section.test.ts`.
+  `model.ts` 8 bentuk (persegi, kotak, WF, T, kanal, siku, Z, pipa), beban bawaan diskalakan ke penampang (`loadScale`).
+  `stage.ts` tab Properti (sumbu u yang diputar, sumbu utama, elips inersia, GN plastis) / Tegangan Normal (gradien σ,
+  garis netral, inti, titik tangkap N bisa digeser) / Tegangan Geser (potongan digeser, luas Q diarsir, diagram τ(y));
+  `charts.ts` I(θ), σ tegak lurus garis netral, b/Q/τ terhadap y.
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -98,7 +107,10 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   Rocking + geser terkopel (blok tanah) dan sway + rocking meja (kolom jepit–jepit) sudah ada. Lanjutan: penanaman blok
   (embedment), konstanta tanah bergantung frekuensi, massa/lentur kolom & balok meja, torsi (yawing), multi-silinder,
   isolator pegas.
-- Belum: Room lain (Fase 2 Material, Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
+- Live: **Room Section** (tab Properti / Tegangan Normal / Tegangan Geser): tabel Steiner, rumus vs grid, Iu(θ), Z & faktor
+  bentuk, inti penampang, keseimbangan ∫σ dA, τ di loncatan sayap–badan. Lanjutan: penampang bebas (tambah/geser persegi),
+  pusat geser & aliran geser di sayap tipis, torsi, penampang beton bertulang (retak/transformasi), penampang komposit.
+- Belum: Room lain (Fase 2 Material: Tensile Test, Buckling; Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
 - Repo GitHub berstatus publik, sementara README menyebut proprietary.
