@@ -61,7 +61,7 @@ Dasar dinamika struktur dan gempa.
 |---|---|---|
 | **Structure Model** | Model 2D sederhana: balok (sederhana, kantilever, menerus), portal, gable, truss. Beban titik/merata yang bisa digeser, reaksi, diagram N/V/M, lendutan dibesarkan | **MVP — live** |
 | Equilibrium | Diagram benda bebas, resultan gaya, tuas & momen, katrol | Fase 2 |
-| Influence Line | Beban berjalan di atas balok/truss, garis pengaruh reaksi, geser, momen | Fase 2 |
+| Influence Line | Beban berjalan di atas balok (sederhana, menerus)/truss, garis pengaruh reaksi, geser, momen, gaya batang; Müller–Breslau, truk T, beban lajur | **live** |
 | Cable & Arch | Kabel parabola/katenari, pelengkung tiga sendi, garis tekan | Fase 3 |
 
 ### Zone 3 — Material & Elemen *(Mekanika Bahan)*

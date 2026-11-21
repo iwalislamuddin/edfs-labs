@@ -38,7 +38,7 @@ export const zones: Zone[] = [
     rooms: [
       { slug: 'structure', name: 'Structure Model', desc: 'Balok, portal, gable, truss: reaksi, diagram N-V-M, lendutan.', state: 'live' },
       { slug: 'equilibrium', name: 'Equilibrium', desc: 'Diagram benda bebas, resultan gaya, momen dan tuas.', state: 'soon' },
-      { slug: 'influence-line', name: 'Influence Line', desc: 'Beban berjalan dan garis pengaruh.', state: 'soon' },
+      { slug: 'influence-line', name: 'Influence Line', desc: 'Beban berjalan, garis pengaruh balok & rangka, Müller–Breslau, truk T dan beban lajur.', state: 'live' },
       { slug: 'cable-arch', name: 'Cable & Arch', desc: 'Kabel, pelengkung tiga sendi, garis tekan.', state: 'soon' },
     ],
   },

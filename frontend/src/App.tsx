@@ -7,6 +7,7 @@ const ROOMS: Record<string, React.LazyExoticComponent<React.ComponentType<{ quer
   spring: lazy(() => import('./rooms/spring/SpringRoom')),
   pendulum: lazy(() => import('./rooms/pendulum/PendulumRoom')),
   structure: lazy(() => import('./rooms/structure/StructureRoom')),
+  'influence-line': lazy(() => import('./rooms/influence-line/InfluenceRoom')),
   element: lazy(() => import('./rooms/element/ElementRoom')),
   section: lazy(() => import('./rooms/section/SectionRoom')),
   buckling: lazy(() => import('./rooms/buckling/BucklingRoom')),

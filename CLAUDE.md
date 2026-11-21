@@ -96,6 +96,15 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   ASTM C469, uji belah fct = 2P/(πLD) + σx/σy elastis di diameter. Diuji di `material.test.ts`. Tab Uji Tarik / Bongkar-Muat
   (siklus otomatis) / Bandingkan (deret benda uji patah, batang ketangguhan) / Beton (tekan silinder, tarik belah).
   Grafik garis umum (`chart()`, `fmt`) dipindah ke `lab/chart.ts` (dipakai Buckling dan Tensile Test).
+  Room Influence Line (`rooms/influence-line/`, slug `influence-line`): `model.ts` (balok sederhana + kantilever c1/c2, menerus
+  2–3 bentang, rangka Pratt/Howe/Warren dipinjam dari `build('truss')` Room Structure, lantai di batang bawah dengan gelagar
+  memanjang → beban dibagi ke simpul panel; `matrixEffect()` = analisis langsung `frame2d` untuk sekumpulan beban; truk T
+  50/225/225 kN jarak 5 m + g; query `r` = respons R0..R3/V/M/N, `veh`, `dir`). `theory.ts` terpisah dari solver: statika
+  (V(xs) = Σ gaya kiri, beban tepat di potongan dihitung di kiri), tiga momen (`supportMoments`, Thomas) → reaksi, potongan
+  Ritter otomatis `findRitter` (sisi kiri = simpul bawah x ≤ xb + atas x ≤ xt, atau semua simpul kecuali satu = keseimbangan
+  simpul; ΣFy bila batang lain horizontal, selain itu ΣM terhadap O), `ilCurve`/`ilStats` (luas ±), `truckExtremes` (gandar di
+  titik patah + sapuan, dua arah). Diuji di `influence.test.ts` (semua batang rangka teori = matriks, Müller–Breslau via Maxwell,
+  superposisi truk). `stage.ts` struktur + beban (atas) dan garis pengaruh sejajar (bawah), titik terukur per Lt/60, Müller–Breslau.
 - `ui/` — `Lobby.tsx`, `controls.tsx` (Slider, Segmented, Check).
 
 ## Menambah Room baru
@@ -134,6 +143,10 @@ Preview Claude: konfigurasi `labs` di `.claude/launch.json`.
   pita Lüders, leher, patahan mangkuk–kerucut/getas), seret crosshead, data dengan derau, tabel model vs terukur, kurva
   sebenarnya, syarat BjTS 420B (Rm/Re ≥ 1,25). Lanjutan: penuaan regangan & Bauschinger (siklus tarik–tekan), laju regangan,
   suhu/Charpy, pelat (benda uji pipih), tulangan dengan sirip, kurva desain baja tulangan bilinear/Park untuk Room beton.
+- Live: **Room Influence Line** (Balok Sederhana / Balok Menerus / Rangka Batang): beban satuan berjalan (otomatis/geser),
+  GP teori vs titik terukur, Müller–Breslau, potongan Ritter + titik O digambar, truk T (posisi kritis, grafik efek vs X),
+  beban lajur q·A + p·η (pola BTR+BGT). Lanjutan: balok Gerber (sendi dalam), lantai di batang atas, GP lendutan,
+  selubung momen akibat truk, kereta beban/BM, rangka tepi tak sejajar (Parker/K).
 - Belum: Room lain (Fluida, Tanah), teks UI EN, deploy Cloudflare + SSO Supabase,
   Worksheet/akses Free–Premium (lihat KONSEP.md, Fase 1–3).
 - Cacat visual kecil: label "-180°" di setup rotasi menimpa arsir tanah; label Fk di setup tekan dekat garis "panjang bebas".
